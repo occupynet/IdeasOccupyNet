@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/wysiwyg-editor/qa-wysiwyg-upload.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Page module class for WYSIWYG editor (CKEditor) file upload receiver
 
 
@@ -32,6 +31,7 @@
 		{
 			return ($request=='wysiwyg-editor-upload');
 		}
+
 		
 		function process_request($request)
 		{
@@ -51,14 +51,14 @@
 					require_once QA_INCLUDE_DIR.'qa-app-users.php';
 					require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 			
-					switch (qa_user_permit_error(null, 'U'))
+					switch (qa_user_permit_error(null, QA_LIMIT_UPLOADS))
 					{
 						case 'limit':
 							$message=qa_lang('main/upload_limit');
 							break;
 						
 						case false:
-							qa_limits_increment(qa_get_logged_in_userid(), 'U');
+							qa_limits_increment(qa_get_logged_in_userid(), QA_LIMIT_UPLOADS);
 							break;
 
 						default:
@@ -107,7 +107,7 @@
 					$userid=qa_get_logged_in_userid();
 					$cookieid=isset($userid) ? qa_cookie_get() : qa_cookie_get_create();
 					
-					$blobid=qa_db_blob_create(file_get_contents($file['tmp_name']), $extension, @$file['name'], $userid, $cookieid, @$_SERVER['REMOTE_ADDR']);
+					$blobid=qa_db_blob_create(file_get_contents($file['tmp_name']), $extension, @$file['name'], $userid, $cookieid, qa_remote_ip_address());
 					
 					if (isset($blobid))
 						$url=qa_get_blob_url($blobid, true);
@@ -121,6 +121,7 @@
 			
 			return null;
 		}
+		
 	}
 
 

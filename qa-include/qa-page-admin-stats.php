@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-stats.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for admin page showing usage statistics and clean-up buttons
 
 
@@ -51,8 +50,6 @@
 
 	$ccount=(int)qa_opt('cache_ccount');
 	$ccount_anon=qa_db_count_posts('C', false);
-	
-	$mysqlversion=qa_db_read_one_value(qa_db_query_raw('SELECT VERSION()'));
 
 	
 //	Prepare content for theme
@@ -72,6 +69,11 @@
 				'value' => qa_html(QA_VERSION),
 			),
 			
+			'q2a_date' => array(
+				'label' => qa_lang_html('admin/q2a_build_date'),
+				'value' => qa_html(QA_BUILD_DATE),
+			),
+			
 			'q2a_latest' => array(
 				'label' => qa_lang_html('admin/q2a_latest_version'),
 				'type' => 'custom',
@@ -79,9 +81,22 @@
 					'" WIDTH="100" HEIGHT="16" STYLE="vertical-align:middle; border:0; background:transparent;" allowTransparency="true" SCROLLING="no" FRAMEBORDER="0"></IFRAME>',
 			),
 			
+			'break0' => array(
+				'type' => 'blank',
+			),
+			
 			'db_version' => array(
 				'label' => qa_lang_html('admin/q2a_db_version'),
 				'value' => qa_html(qa_opt('db_version')),
+			),
+			
+			'db_size' => array(
+				'label' => qa_lang_html('admin/q2a_db_size'),
+				'value' => qa_html(number_format(qa_db_table_size()/1048576, 1).' MB'),
+			),
+			
+			'break1' => array(
+				'type' => 'blank',
 			),
 			
 			'php_version' => array(
@@ -91,10 +106,10 @@
 			
 			'mysql_version' => array(
 				'label' => qa_lang_html('admin/mysql_version'),
-				'value' => qa_html($mysqlversion),
+				'value' => qa_html(qa_db_mysql_version()),
 			),
 			
-			'break0' => array(
+			'break2' => array(
 				'type' => 'blank',
 			),
 	
@@ -113,7 +128,7 @@
 				'value' => qa_html(number_format($qcount_anon)),
 			),
 			
-			'break1' => array(
+			'break3' => array(
 				'type' => 'blank',
 			),
 	
@@ -132,7 +147,7 @@
 				'value' => qa_html(number_format($acount_anon)),
 			),
 			
-			'break2' => array(
+			'break4' => array(
 				'type' => 'blank',
 			),
 			
@@ -151,7 +166,7 @@
 				'value' => qa_html(number_format($ccount_anon)),
 			),
 			
-			'break3' => array(
+			'break5' => array(
 				'type' => 'blank',
 			),
 			
@@ -200,16 +215,22 @@
 				'note' => '<SPAN ID="recount_posts_note">'.qa_lang_html('admin/recount_posts_note').'</SPAN>',
 			),
 	
-			'reindex_posts' => array(
-				'label' => qa_lang_html('admin/reindex_posts'),
-				'tags' => 'NAME="doreindexposts" onClick="return qa_recalc_click(this.name, this, '.qa_js(qa_lang('admin/reindex_posts_stop')).', \'reindex_posts_note\');"',
-				'note' => '<SPAN ID="reindex_posts_note">'.qa_lang_html('admin/reindex_posts_note').'</SPAN>',
+			'reindex_content' => array(
+				'label' => qa_lang_html('admin/reindex_content'),
+				'tags' => 'NAME="doreindexcontent" onClick="return qa_recalc_click(this.name, this, '.qa_js(qa_lang('admin/reindex_content_stop')).', \'reindex_content_note\');"',
+				'note' => '<SPAN ID="reindex_content_note">'.qa_lang_html('admin/reindex_content_note').'</SPAN>',
 			),
 			
 			'recalc_points' => array(
 				'label' => qa_lang_html('admin/recalc_points'),
 				'tags' => 'NAME="dorecalcpoints" onClick="return qa_recalc_click(this.name, this, '.qa_js(qa_lang('admin/recalc_stop')).', \'recalc_points_note\');"',
 				'note' => '<SPAN ID="recalc_points_note">'.qa_lang_html('admin/recalc_points_note').'</SPAN>',
+			),
+			
+			'refill_events' => array(
+				'label' => qa_lang_html('admin/refill_events'),
+				'tags' => 'NAME="dorefillevents" onClick="return qa_recalc_click(this.name, this, '.qa_js(qa_lang('admin/recalc_stop')).', \'refill_events_note\');"',
+				'note' => '<SPAN ID="refill_events_note">'.qa_lang_html('admin/refill_events_note').'</SPAN>',
 			),
 			
 			'recalc_categories' => array(
@@ -232,8 +253,8 @@
 	$qa_content['script_rel'][]='qa-content/qa-admin.js?'.QA_VERSION;
 	$qa_content['script_var']['qa_warning_recalc']=qa_lang('admin/stop_recalc_warning');
 
-	
 	$qa_content['navigation']['sub']=qa_admin_sub_navigation();
+
 	
 	return $qa_content;
 

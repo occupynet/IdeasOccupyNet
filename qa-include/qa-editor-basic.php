@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-editor-basic.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Basic editor module for plain text editing
 
 
@@ -36,7 +35,8 @@
 		function load_module($localdir, $htmldir)
 		{
 		}
-		
+	
+	
 		function calc_quality($content, $format)
 		{
 			if ($format=='')
@@ -47,11 +47,9 @@
 				return 0;
 		}
 
-		function get_field(&$qa_content, $content, $format, $fieldname, $rows, $autofocus)
+
+		function get_field(&$qa_content, $content, $format, $fieldname, $rows /* $autofocus parameter deprecated */)
 		{
-			if ($autofocus)
-				$qa_content['focusid']=$fieldname;
-			
 			return array(
 				'type' => 'textarea',
 				'tags' => 'NAME="'.$fieldname.'" ID="'.$fieldname.'"',
@@ -59,7 +57,13 @@
 				'rows' => $rows,
 			);
 		}
+
+		function focus_script($fieldname)
+		{
+			return "document.getElementById('".$fieldname."').focus();";
+		}
 		
+
 		function read_post($fieldname)
 		{
 			return array(
@@ -68,7 +72,7 @@
 			);
 		}
 	
-	};
+	}
 	
 
 /*

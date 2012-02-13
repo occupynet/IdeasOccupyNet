@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-external-users-wp.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: External user functions for WordPress integration
 
 
@@ -84,11 +83,11 @@
 
 	function qa_get_userids_from_public($publicusernames)
 	{
-		global $table_prefix;
+		global $wpdb;
 		
 		if (count($publicusernames))
 			return qa_db_read_all_assoc(qa_db_query_sub(
-				'SELECT user_nicename, ID FROM '.$table_prefix.'users WHERE user_nicename IN ($)',
+				'SELECT user_nicename, ID FROM '.$wpdb->base_prefix.'users WHERE user_nicename IN ($)',
 				$publicusernames
 			), 'user_nicename', 'ID');
 		else
@@ -98,11 +97,11 @@
 
 	function qa_get_public_from_userids($userids)
 	{
-		global $table_prefix;
+		global $wpdb;
 		
 		if (count($userids))
 			return qa_db_read_all_assoc(qa_db_query_sub(
-				'SELECT user_nicename, ID FROM '.$table_prefix.'users WHERE ID IN (#)',
+				'SELECT user_nicename, ID FROM '.$wpdb->base_prefix.'users WHERE ID IN (#)',
 				$userids
 			), 'ID', 'user_nicename');
 		else
@@ -139,7 +138,7 @@
 	}
 
 
-	function qa_user_report_action($userid, $action, $questionid, $answerid, $commentid)
+	function qa_user_report_action($userid, $action)
 	{
 	}
 

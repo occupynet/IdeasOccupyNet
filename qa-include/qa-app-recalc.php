@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-recalc.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Managing database recalculations (clean-up operations) and status messages
 
 
@@ -28,8 +27,8 @@
 /*
 	A full list of redundant (non-normal) information in the database that can be recalculated:
 	
-	Recalculated in doreindexposts:
-	===============================
+	Recalculated in doreindexcontent:
+	================================
 	^titlewords (all): index of words in titles of posts
 	^contentwords (all): index of words in content of posts
 	^tagwords (all): index of words in tags of posts (a tag can contain multiple words)
@@ -39,11 +38,11 @@
 	
 	Recalculated in dorecountposts:
 	==============================
-	^posts (upvotes, downvotes, netvotes, hotness, acount, flagcount): number of votes, hotness, answers, flags received by posts
+	^posts (upvotes, downvotes, netvotes, hotness, acount, amaxvotes, flagcount): number of votes, hotness, answers, answer votes, flags
 	
 	Recalculated in dorecalcpoints:
 	===============================
-	^userpoints (all): points calculation for all users
+	^userpoints (all except bonus): points calculation for all users
 	^options (title=cache_userpointscount):
 	
 	Recalculated in dorecalccategories:
@@ -52,6 +51,13 @@
 	^posts (catidpath1, catidpath2, catidpath3): hierarchical path to category ids (requires QA_CATEGORY_DEPTH=4)
 	^categories (qcount): number of (visible) questions in each category
 	^categories (backpath): full (backwards) path of slugs to that category
+	
+	Recalculated in dorebuildupdates:
+	=================================
+	^sharedevents (all): per-entity event streams (see big comment in qa-db-favorites.php)
+	^userevents (all): per-subscriber event streams
+	
+	[but these are not entirely redundant since they can contain historical information no longer in ^posts]
 */
 
 	if (!defined('QA_VERSION')) { // don't allow this page to be requested directly from browser
@@ -80,19 +86,50 @@
 		@list($operation, $length, $next, $done)=explode(',', $state);
 		
 		switch ($operation) {
-			case 'doreindexposts':
-				qa_recalc_transition($state, 'doreindexposts_postcount');
+			case 'doreindexcontent':
+				qa_recalc_transition($state, 'doreindexcontent_pagereindex');
 				break;
 				
-			case 'doreindexposts_postcount':
+			case 'doreindexcontent_pagereindex':
+				$pages=qa_db_pages_get_for_reindexing($next, 10);
+				
+				if (count($pages)) {
+					require_once QA_INCLUDE_DIR.'qa-app-format.php';
+					
+					$lastpageid=max(array_keys($pages));
+					
+					foreach ($pages as $pageid => $page)
+						if (!($page['flags'] & QA_PAGE_FLAGS_EXTERNAL)) {
+							$searchmodules=qa_load_modules_with('search', 'unindex_page');
+							foreach ($searchmodules as $searchmodule)
+								$searchmodule->unindex_page($pageid);
+								
+							$searchmodules=qa_load_modules_with('search', 'index_page');
+							if (count($searchmodules)) {
+								$indextext=qa_viewer_text($page['content'], 'html');
+
+								foreach ($searchmodules as $searchmodule)
+									$searchmodule->index_page($pageid, $page['tags'], $page['heading'], $page['content'], 'html', $indextext);
+							}
+						}
+						
+					$next=1+$lastpageid;
+					$done+=count($pages);
+					$continue=true;
+				
+				} else
+					qa_recalc_transition($state, 'doreindexcontent_postcount');
+				break;
+			
+			case 'doreindexcontent_postcount':
 				qa_db_qcount_update();
 				qa_db_acount_update();
 				qa_db_ccount_update();
 
-				qa_recalc_transition($state, 'doreindexposts_reindex');
+				qa_recalc_transition($state, 'doreindexcontent_postreindex');
 				break;
 				
-			case 'doreindexposts_reindex':
+			case 'doreindexcontent_postreindex':
 				$posts=qa_db_posts_get_for_reindexing($next, 10);
 				
 				if (count($posts)) {
@@ -101,10 +138,13 @@
 					$lastpostid=max(array_keys($posts));
 					
 					qa_db_prepare_for_reindexing($next, $lastpostid);
+					qa_suspend_update_counts();
 		
-					foreach ($posts as $postid => $post)
-						qa_post_index($postid, $post['type'], $post['questionid'], $post['title'],
-							qa_viewer_text($post['content'], $post['format']), $post['tags'], true);
+					foreach ($posts as $postid => $post) {
+						qa_post_unindex($postid);
+						qa_post_index($postid, $post['type'], $post['questionid'], $post['parentid'], $post['title'], $post['content'],
+							$post['format'], qa_viewer_text($post['content'], $post['format']), $post['tags'], $post['categoryid']);
+					}
 					
 					$next=1+$lastpostid;
 					$done+=count($posts);
@@ -143,23 +183,41 @@
 				qa_db_acount_update();
 				qa_db_ccount_update();
 				qa_db_unaqcount_update();
+				qa_db_unselqcount_update();
 
-				qa_recalc_transition($state, 'dorecountposts_recount');
+				qa_recalc_transition($state, 'dorecountposts_votecount');
 				break;
 				
-			case 'dorecountposts_recount':
+			case 'dorecountposts_votecount':
 				$postids=qa_db_posts_get_for_recounting($next, 1000);
 				
 				if (count($postids)) {
 					$lastpostid=max($postids);
 					
-					qa_db_posts_recount($next, $lastpostid);
+					qa_db_posts_votes_recount($next, $lastpostid);
+					
+					$next=1+$lastpostid;
+					$done+=count($postids);
+					$continue=true;
+
+				} else
+					qa_recalc_transition($state, 'dorecountposts_acount');
+				break;
+				
+			case 'dorecountposts_acount':
+				$postids=qa_db_posts_get_for_recounting($next, 1000);
+				
+				if (count($postids)) {
+					$lastpostid=max($postids);
+					
+					qa_db_posts_answers_recount($next, $lastpostid);
 					
 					$next=1+$lastpostid;
 					$done+=count($postids);
 					$continue=true;
 
 				} else {
+					qa_db_unupaqcount_update();
 					qa_recalc_transition($state, 'dorecountposts_complete');
 				}
 				break;
@@ -192,6 +250,95 @@
 				}
 				break;
 				
+			case 'dorefillevents':
+				qa_recalc_transition($state, 'dorefillevents_qcount');
+				break;
+				
+			case 'dorefillevents_qcount':
+				qa_db_qcount_update();
+				qa_recalc_transition($state, 'dorefillevents_refill');
+				break;
+				
+			case 'dorefillevents_refill':
+				$questionids=qa_db_qs_get_for_event_refilling($next, 1);
+				
+				if (count($questionids)) {
+					require_once QA_INCLUDE_DIR.'qa-app-events.php';
+					require_once QA_INCLUDE_DIR.'qa-app-updates.php';
+					require_once QA_INCLUDE_DIR.'qa-util-sort.php';
+					
+					$lastquestionid=max($questionids);
+					
+					foreach ($questionids as $questionid) {
+
+					//	Retrieve all posts relating to this question
+
+						list($question, $childposts, $achildposts)=qa_db_select_with_pending(
+							qa_db_full_post_selectspec(null, $questionid),
+							qa_db_full_child_posts_selectspec(null, $questionid),
+							qa_db_full_a_child_posts_selectspec(null, $questionid)
+						);
+						
+					//	Merge all posts while preserving keys as postids
+						
+						$posts=array($questionid => $question);
+
+						foreach ($childposts as $postid => $post)
+							$posts[$postid]=$post;
+
+						foreach ($achildposts as $postid => $post)
+							$posts[$postid]=$post;
+							
+					//	Creation and editing of each post
+							
+						foreach ($posts as $postid => $post) {
+							$followonq=($post['basetype']=='Q') && ($postid!=$questionid);
+							
+							qa_create_event_for_q_user($questionid, $postid, $followonq ? QA_UPDATE_FOLLOWS : null, $post['userid'], @$posts[$post['parentid']]['userid'], $post['created']);
+							
+							if (isset($post['updated']) && !$followonq)
+								qa_create_event_for_q_user($questionid, $postid, $post['updatetype'], $post['lastuserid'], $post['userid'], $post['updated']);
+						}
+						
+					//	Tags and categories of question
+
+						qa_create_event_for_tags($question['tags'], $questionid, null, $question['userid'], $question['created']);
+						qa_create_event_for_category($question['categoryid'], $questionid, null, $question['userid'], $question['created']);
+						
+					//	Collect comment threads
+						
+						$parentidcomments=array();
+						
+						foreach ($posts as $postid => $post)
+							if ($post['basetype']=='C')
+								$parentidcomments[$post['parentid']][$postid]=$post;
+					
+					//	For each comment thread, notify all previous comment authors of each comment in the thread (could get slow)
+
+						foreach ($parentidcomments as $parentid => $comments) {
+							$keyuserids=array();
+							
+							qa_sort_by($comments, 'created');
+							
+							foreach ($comments as $comment) {
+								foreach ($keyuserids as $keyuserid => $dummy)
+									if ( ($keyuserid != $comment['userid']) && ($keyuserid != @$posts[$parentid]['userid']) )
+										qa_db_event_create_not_entity($keyuserid, $questionid, $comment['postid'], null, $comment['userid'], $comment['created']);
+
+								if (isset($comment['userid']))
+									$keyuserids[$comment['userid']]=true;
+							}
+						}
+					}
+					
+					$next=1+$lastquestionid;
+					$done+=count($questionids);
+					$continue=true;
+
+				} else
+					qa_recalc_transition($state, 'dorefillevents_complete');
+				break;
+			
 			case 'dorecalccategories':
 				qa_recalc_transition($state, 'dorecalccategories_postcount');
 				break;
@@ -264,20 +411,11 @@
 				$posts=qa_db_posts_get_for_deleting('C', $next, 1);
 				
 				if (count($posts)) {
+					require_once QA_INCLUDE_DIR.'qa-app-posts.php';
+					
 					$postid=$posts[0];
-					
-					$oldcomment=qa_db_single_select(qa_db_full_post_selectspec(null, $postid));
-					$parent=qa_db_single_select(qa_db_full_post_selectspec(null, $oldcomment['parentid']));
-					
-					if ($parent['basetype']=='Q') {
-						$question=$parent;
-						$answer=null;
-					} else {
-						$question=qa_db_single_select(qa_db_full_post_selectspec(null, $parent['parentid']));
-						$answer=$parent;
-					}
 
-					qa_comment_delete($oldcomment, $question, $answer, null, null, null);
+					qa_post_delete($postid);
 					
 					$next=1+$postid;
 					$done++;
@@ -291,11 +429,11 @@
 				$posts=qa_db_posts_get_for_deleting('A', $next, 1);
 				
 				if (count($posts)) {
+					require_once QA_INCLUDE_DIR.'qa-app-posts.php';
+					
 					$postid=$posts[0];
 					
-					$oldanswer=qa_db_single_select(qa_db_full_post_selectspec(null, $postid));
-					$question=qa_db_single_select(qa_db_full_post_selectspec(null, $oldanswer['parentid']));
-					qa_answer_delete($oldanswer, $question, null, null, null);
+					qa_post_delete($postid);
 					
 					$next=1+$postid;
 					$done++;
@@ -309,10 +447,11 @@
 				$posts=qa_db_posts_get_for_deleting('Q', $next, 1);
 				
 				if (count($posts)) {
+					require_once QA_INCLUDE_DIR.'qa-app-posts.php';
+					
 					$postid=$posts[0];
 					
-					$oldquestion=qa_db_single_select(qa_db_full_post_selectspec(null, $postid));
-					qa_question_delete($oldquestion, null, null, null);
+					qa_post_delete($postid);
 					
 					$next=1+$postid;
 					$done++;
@@ -349,7 +488,11 @@
 */
 	{
 		switch ($operation) {
-			case 'doreindexposts_reindex':
+			case 'doreindexcontent_pagereindex':
+				$length=qa_db_count_pages();
+				break;
+			
+			case 'doreindexcontent_postreindex':
 				$length=qa_opt('cache_qcount')+qa_opt('cache_acount')+qa_opt('cache_ccount');
 				break;
 			
@@ -361,11 +504,16 @@
 				$length=qa_opt('cache_userpointscount');
 				break;
 				
-			case 'dorecountposts_recount':
+			case 'dorecountposts_votecount':
+			case 'dorecountposts_acount':
 			case 'dorecalccategories_postupdate':
 				$length=qa_db_count_posts();
 				break;
 				
+			case 'dorefillevents_refill':
+				$length=qa_opt('cache_qcount')+qa_db_count_posts('Q_HIDDEN');
+				break;
+			
 			case 'dorecalccategories_recount':
 			case 'dorecalccategories_backpaths':
 				$length=qa_db_count_categories();
@@ -403,13 +551,21 @@
 		$length=(int)$length;
 		
 		switch ($operation) {
-			case 'doreindexposts_postcount':
+			case 'doreindexcontent_postcount':
 			case 'dorecountposts_postcount':
 			case 'dorecalccategories_postcount':
+			case 'dorefillevents_qcount':
 				$message=qa_lang('admin/recalc_posts_count');
 				break;
 				
-			case 'doreindexposts_reindex':
+			case 'doreindexcontent_pagereindex':
+				$message=strtr(qa_lang('admin/reindex_pages_reindexed'), array(
+					'^1' => number_format($done),
+					'^2' => number_format($length)
+				));
+				break;
+
+			case 'doreindexcontent_postreindex':
 				$message=strtr(qa_lang('admin/reindex_posts_reindexed'), array(
 					'^1' => number_format($done),
 					'^2' => number_format($length)
@@ -423,8 +579,15 @@
 				));
 				break;
 				
-			case 'dorecountposts_recount':
-				$message=strtr(qa_lang('admin/recount_posts_recounted'), array(
+			case 'dorecountposts_votecount':
+				$message=strtr(qa_lang('admin/recount_posts_votes_recounted'), array(
+					'^1' => number_format($done),
+					'^2' => number_format($length)
+				));
+				break;
+				
+			case 'dorecountposts_acount':
+				$message=strtr(qa_lang('admin/recount_posts_as_recounted'), array(
 					'^1' => number_format($done),
 					'^2' => number_format($length)
 				));
@@ -451,6 +614,17 @@
 				
 			case 'dorecalcpoints_complete':
 				$message=qa_lang('admin/recalc_points_complete');
+				break;
+				
+			case 'dorefillevents_refill':
+				$message=strtr(qa_lang('admin/refill_events_refilled'), array(
+					'^1' => number_format($done),
+					'^2' => number_format($length)
+				));
+				break;
+				
+			case 'dorefillevents_complete':
+				$message=qa_lang('admin/refill_events_complete');
 				break;
 				
 			case 'dorecalccategories_postupdate':

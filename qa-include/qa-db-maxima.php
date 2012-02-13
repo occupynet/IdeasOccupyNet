@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-maxima.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Definitions that determine database column size and rows retrieved
 
 
@@ -51,6 +50,9 @@
 	@define('QA_DB_MAX_PROFILE_CONTENT_LENGTH', 8000);
 	@define('QA_DB_MAX_CACHE_AGE', 86400);
 	@define('QA_DB_MAX_BLOB_FILE_NAME_LENGTH', 255);
+	@define('QA_DB_MAX_META_TITLE_LENGTH', 40);
+	@define('QA_DB_MAX_META_CONTENT_LENGTH', 8000);
+
 
 //	How many records to retrieve for different circumstances. In many cases we retrieve more records than we
 //	end up needing to display once we know the value of an option. Wasteful, but allows one query per page.
@@ -60,6 +62,13 @@
 	@define('QA_DB_RETRIEVE_USERS', 200);
 	@define('QA_DB_RETRIEVE_ASK_TAG_QS', 500);
 	@define('QA_DB_RETRIEVE_COMPLETE_TAGS', 10000);
+	@define('QA_DB_RETRIEVE_MESSAGES', 10);
+
+	
+//	Keep event streams trimmed - not worth storing too many events per question because we only display the
+//	most recent event for each question, that has not been invalidated due to hiding/unselection/etc...
+
+	@define('QA_DB_MAX_EVENTS_PER_Q', 5);
 
 
 /*

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-external-example/qa-external-users.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Example of how to integrate with your own user database
 
 
@@ -43,7 +42,7 @@
 	{
 /*
 	==========================================================================
-	      YOU MUST MODIFY THIS FUNCTION *BEFORE* QA CREATES ITS DATABASE
+	     YOU MUST MODIFY THIS FUNCTION *BEFORE* Q2A CREATES ITS DATABASE
 	==========================================================================
 
 	You should return the appropriate MySQL column type to use for the userid,
@@ -77,12 +76,12 @@
 
 	function qa_get_login_links($relative_url_prefix, $redirect_back_to_url)
 /*
-	==========================================================================
-	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER QA CREATES ITS DATABASE
-	==========================================================================
+	===========================================================================
+	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER Q2A CREATES ITS DATABASE
+	===========================================================================
 
 	You should return an array containing URLs for the login, register and logout pages on
-	your site. These URLs will be used as appropriate within the QA site.
+	your site. These URLs will be used as appropriate within the Q2A site.
 	
 	You may return absolute or relative URLs for each page. If you do not want one of the links
 	to show, omit it from the array, or use null or an empty string.
@@ -90,20 +89,20 @@
 	If you use absolute URLs, then return an array with the URLs in full (see example 1 below).
 
 	If you use relative URLs, the URLs should start with $relative_url_prefix, followed by the
-	relative path from the root of the QA site to your login page. Like in example 2 below, if
-	the QA site is in a subdirectory, $relative_url_prefix.'../' refers to your site root.
+	relative path from the root of the Q2A site to your login page. Like in example 2 below, if
+	the Q2A site is in a subdirectory, $relative_url_prefix.'../' refers to your site root.
 	
-	Now, about $redirect_back_to_url. Let's say a user is viewing a page on the QA site, and
+	Now, about $redirect_back_to_url. Let's say a user is viewing a page on the Q2A site, and
 	clicks a link to the login URL that you returned from this function. After they log in using
-	the form on your main site, they want to automatically go back to the page on the QA site
+	the form on your main site, they want to automatically go back to the page on the Q2A site
 	where they came from. This can be done with an HTTP redirect, but how does your login page
 	know where to redirect the user to? The solution is $redirect_back_to_url, which is the URL
-	of the page on the QA site where you should send the user once they've successfully logged
+	of the page on the Q2A site where you should send the user once they've successfully logged
 	in. To implement this, you can add $redirect_back_to_url as a parameter to the login URL
 	that you return from this function. Your login page can then read it in from this parameter,
 	and redirect the user back to the page after they've logged in. The same applies for your
 	register and logout pages. Note that the URL you are given in $redirect_back_to_url is
-	relative to the root of the QA site, so you may need to add something.
+	relative to the root of the Q2A site, so you may need to add something.
 */
 	{
 
@@ -118,7 +117,7 @@
 	/*
 		Example 1 - using absolute URLs, suitable if:
 		
-		* Your QA site:        http://qa.mysite.com/
+		* Your Q2A site:       http://qa.mysite.com/
 		* Your login page:     http://www.mysite.com/login
 		* Your register page:  http://www.mysite.com/register
 		* Your logout page:    http://www.mysite.com/logout
@@ -134,7 +133,7 @@
 	/*
 		Example 2 - using relative URLs, suitable if:
 		
-		* Your QA site:        http://www.mysite.com/qa/
+		* Your Q2A site:       http://www.mysite.com/qa/
 		* Your login page:     http://www.mysite.com/login.php
 		* Your register page:  http://www.mysite.com/register.php
 		* Your logout page:    http://www.mysite.com/logout.php
@@ -165,9 +164,9 @@
 
 	function qa_get_logged_in_user()
 /*
-	==========================================================================
-	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER QA CREATES ITS DATABASE
-	==========================================================================
+	===========================================================================
+	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER Q2A CREATES ITS DATABASE
+	===========================================================================
 
 	qa_get_logged_in_user()
 	
@@ -184,10 +183,10 @@
 	The result of this function will be passed to your other function qa_get_logged_in_user_html()
 	so you may add any other elements to the returned array if they will be useful to you.
 
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
 	
-	In order to access the admin interface of your QA site, ensure that the array element 'level'
+	In order to access the admin interface of your Q2A site, ensure that the array element 'level'
 	contains QA_USER_LEVEL_ADMIN or QA_USER_LEVEL_SUPER when you are logged in.
 */
 	{
@@ -201,7 +200,7 @@
 		
 		* You store the login state and user in a PHP session
 		* You use textual user identifiers that also serve as public usernames
-		* Your database is shared with the QA site
+		* Your database is shared with the Q2A site
 		* Your database has a users table that contains emails
 		* The administrator has the user identifier 'admin'
 		
@@ -236,7 +235,7 @@
 		
 		* You store a session ID inside a cookie
 		* You use numerical user identifiers
-		* Your database is shared with the QA site
+		* Your database is shared with the Q2A site
 		* Your database has a sessions table that maps session IDs to users
 		* Your database has a users table that contains usernames, emails and a flag for admin privileges
 		
@@ -268,16 +267,16 @@
 	
 	function qa_get_user_email($userid)
 /*
-	==========================================================================
-	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER QA CREATES ITS DATABASE
-	==========================================================================
+	===========================================================================
+	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER Q2A CREATES ITS DATABASE
+	===========================================================================
 
 	qa_get_user_email($userid)
 	
 	Return the email address for user $userid, or null if you don't know it.
 	
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
 */
 	{
 
@@ -288,7 +287,7 @@
 	/*
 		Example 1 - suitable if:
 		
-		* Your database is shared with the QA site
+		* Your database is shared with the Q2A site
 		* Your database has a users table that contains emails
 		
 		$qa_db_connection=qa_db_connection();
@@ -311,18 +310,19 @@
 
 	function qa_get_userids_from_public($publicusernames)
 /*
-	==========================================================================
-	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER QA CREATES ITS DATABASE
-	==========================================================================
+	===========================================================================
+	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER Q2A CREATES ITS DATABASE
+	===========================================================================
 
 	qa_get_userids_from_public($publicusernames)
 	
 	You should take the array of public usernames in $publicusernames, and return an array which
-	maps those usernames to internal user ids. For each element of this array, the username you
-	were given should be in the key, with the corresponding user id in the value.
+	maps valid usernames to internal user ids. For each element of this array, the username should be
+	in the key, with the corresponding user id in the value. If your usernames are case- or accent-
+	insensitive, keys should contain the usernames as stored, not necessarily as in $publicusernames.
 	
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
 	access this database or any other, try to use a single query instead of one per user.
 */
 	{
@@ -348,7 +348,7 @@
 		Example 2 - suitable if:
 		
 		* You use numerical user identifiers
-		* Your database is shared with the QA site
+		* Your database is shared with the Q2A site
 		* Your database has a users table that contains usernames
 		
 		$publictouserid=array();
@@ -377,20 +377,20 @@
 
 	function qa_get_public_from_userids($userids)
 /*
-	==========================================================================
-	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER QA CREATES ITS DATABASE
-	==========================================================================
+	===========================================================================
+	YOU MUST MODIFY THIS FUNCTION, BUT CAN DO SO AFTER Q2A CREATES ITS DATABASE
+	===========================================================================
 
 	qa_get_public_from_userids($userids)
 	
 	This is exactly like qa_get_userids_from_public(), but works in the other direction.
 	
-	You should take the array of user identifiers in $userids, and return an array which maps
-	those to public usernames. For each element of this array, the userid you were given should
+	You should take the array of user identifiers in $userids, and return an array which maps valid
+	userids to public usernames. For each element of this array, the userid you were given should
 	be in the key, with the corresponding username in the value.
 	
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
 	access this database or any other, try to use a single query instead of one per user.
 */
 	{
@@ -416,7 +416,7 @@
 		Example 2 - suitable if:
 		
 		* You use numerical user identifiers
-		* Your database is shared with the QA site
+		* Your database is shared with the Q2A site
 		* Your database has a users table that contains usernames
 		
 		$useridtopublic=array();
@@ -452,22 +452,22 @@
 	qa_get_logged_in_user_html($logged_in_user, $relative_url_prefix)
 
 	You should return HTML code which identifies the logged in user, to be displayed next to the
-	logout link on the QA pages. This HTML will only be shown to the logged in user themselves.
+	logout link on the Q2A pages. This HTML will only be shown to the logged in user themselves.
 
 	$logged_in_user is the array that you returned from qa_get_logged_in_user(). Hopefully this
 	contains enough information to generate the HTML without another database query, but if not,
-	call qa_db_connection() to get the connection to the QA database.
+	call qa_db_connection() to get the connection to the Q2A database.
 
-	$relative_url_prefix is a relative URL to the root of the QA site, which may be useful if
-	you want to include a link that uses relative URLs. If the QA site is in a subdirectory of
+	$relative_url_prefix is a relative URL to the root of the Q2A site, which may be useful if
+	you want to include a link that uses relative URLs. If the Q2A site is in a subdirectory of
 	your site, $relative_url_prefix.'../' refers to your site root (see example 1).
 
 	If you don't know what to display for a user, you can leave the default below. This will
-	show the public username, linked to the QA profile page for the user.
+	show the public username, linked to the Q2A profile page for the user.
 */
 	{
 	
-	//	By default, show the public username linked to the QA profile page for the user
+	//	By default, show the public username linked to the Q2A profile page for the user
 
 		$publicusername=$logged_in_user['publicusername'];
 		
@@ -477,7 +477,7 @@
 	/*
 		Example 1 - suitable if:
 		
-		* Your QA site:        http://www.mysite.com/qa/
+		* Your Q2A site:       http://www.mysite.com/qa/
 		* Your user pages:     http://www.mysite.com/user/[username]
 	
 		$publicusername=$logged_in_user['publicusername'];
@@ -489,7 +489,7 @@
 	/*
 		Example 2 - suitable if:
 		
-		* Your QA site:        http://qa.mysite.com/
+		* Your Q2A site:       http://qa.mysite.com/
 		* Your user pages:     http://www.mysite.com/[username]/
 		* 16x16 user photos:   http://www.mysite.com/[username]/photo-small.jpeg
 	
@@ -514,23 +514,23 @@
 	You should return an array of HTML to display for each user in $userids. For each element of
 	this array, the userid should be in the key, with the corresponding HTML in the value.
 	
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries. If you
 	access this database or any other, try to use a single query instead of one per user.
 	
 	If $should_include_link is true, the HTML may include links to user profile pages.
 	If $should_include_link is false, links should not be included in the HTML.
 	
-	$relative_url_prefix is a relative URL to the root of the QA site, which may be useful if
-	you want to include links that uses relative URLs. If the QA site is in a subdirectory of
+	$relative_url_prefix is a relative URL to the root of the Q2A site, which may be useful if
+	you want to include links that uses relative URLs. If the Q2A site is in a subdirectory of
 	your site, $relative_url_prefix.'../' refers to your site root (see example 1).
 	
 	If you don't know what to display for a user, you can leave the default below. This will
-	show the public username, linked to the QA profile page for each user.
+	show the public username, linked to the Q2A profile page for each user.
 */
 	{
 
-	//	By default, show the public username linked to the QA profile page for each user
+	//	By default, show the public username linked to the Q2A profile page for each user
 
 		$useridtopublic=qa_get_public_from_userids($userids);
 		
@@ -551,7 +551,7 @@
 	/*
 		Example 1 - suitable if:
 		
-		* Your QA site:        http://www.mysite.com/qa/
+		* Your Q2A site:       http://www.mysite.com/qa/
 		* Your user pages:     http://www.mysite.com/user/[username]
 	
 		$useridtopublic=qa_get_public_from_userids($userids);
@@ -572,7 +572,7 @@
 	/*
 		Example 2 - suitable if:
 		
-		* Your QA site:        http://qa.mysite.com/
+		* Your Q2A site:       http://qa.mysite.com/
 		* Your user pages:     http://www.mysite.com/[username]/
 		* User photos (16x16): http://www.mysite.com/[username]/photo-small.jpeg
 	
@@ -595,27 +595,25 @@
 	}
 
 
-	function qa_user_report_action($userid, $action, $questionid, $answerid, $commentid)
+	function qa_user_report_action($userid, $action)
 /*
 	==========================================================================
 	     YOU MAY MODIFY THIS FUNCTION, BUT THE DEFAULT BELOW WILL WORK OK
 	==========================================================================
 
-	qa_user_report_action($userid, $action, $questionid, $answerid, $commentid)
+	qa_user_report_action($userid, $action)
 
 	Informs you about an action by user $userid that modified the database, such as posting,
 	voting, etc... If you wish, you may use this to log user activity or monitor for abuse.
 	
-	Call qa_db_connection() to get the connection to the QA database. If your database is shared with
-	QA, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
+	Call qa_db_connection() to get the connection to the Q2A database. If your database is shared with
+	Q2A, you can use this with PHP's MySQL functions such as mysql_query() to run queries.
 	
 	$action will be a string (such as 'q_edit') describing the action. These strings will match the
-	first $event parameter passed to the process_event(...) function in event modules.
+	first $event parameter passed to the process_event(...) function in event modules. In fact, you might
+	be better off just using a plugin with an event module instead, since you'll get more information.
 	
-	$questionid and/or $answerid and/or $commentid contain the ID of the relevant question or answer
-	or comment affected, or null if this information is not appropriate for $action.
-	
-	FYI, you can get the IP address of the user from $_SERVER['REMOTE_ADDR'].
+	FYI, you can get the IP address of the user from qa_remote_ip_address().
 */
 	{
 		// do nothing by default

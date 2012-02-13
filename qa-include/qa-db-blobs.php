@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-blobs.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database-level access to blobs table for large chunks of data (e.g. images)
 
 
@@ -36,6 +35,8 @@
 	Create a new blob in the database with $content and $format, returning its blobid
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		for ($attempt=0; $attempt<10; $attempt++) {
 			$blobid=qa_db_random_bigint();
 			
@@ -59,8 +60,10 @@
 	Get the content of blob $blobid from the database
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		return qa_db_read_one_assoc(qa_db_query_sub(
-			'SELECT content, format, BINARY filename AS filename FROM ^blobs WHERE blobid=#',
+			'SELECT content, format, filename FROM ^blobs WHERE blobid=#',
 			$blobid
 		), true);
 	}
@@ -71,6 +74,8 @@
 	Delete blob $blobid in the database
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		qa_db_query_sub(
 			'DELETE FROM ^blobs WHERE blobid=#',
 			$blobid
@@ -83,6 +88,8 @@
 	Check if blob $blobid exists in the database
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		return qa_db_read_one_value(qa_db_query_sub(
 			'SELECT COUNT(*) FROM ^blobs WHERE blobid=#',
 			$blobid

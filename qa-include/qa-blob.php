@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-blob.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Response to blob requests, outputting blob from the database
 
 
@@ -26,51 +25,68 @@
 */
 
 
-//	Ensure no PHP errors are shown in the Ajax response
+//	Ensure no PHP errors are shown in the blob response
 
 	@ini_set('display_errors', 0);
 
+	function qa_blob_db_fail_handler()
+	{
+		header('HTTP/1.1 500 Internal Server Error');
+		qa_exit('error');
+	}
+	
 
-//	Load the QA base file which sets up a bunch of crucial functions
+//	Load the Q2A base file which sets up a bunch of crucial stuff
 
 	require 'qa-base.php';
+
+	qa_report_process_stage('init_blob');
 
 
 //	Output the blob in question
 
 	require_once QA_INCLUDE_DIR.'qa-db-blobs.php';
 
-	$blob=qa_db_blob_read(qa_get('qa_blobid'));
-
-	header('Cache-Control: max-age=2592000, public'); // allows browsers and proxies to cache the blob
-
-	switch ($blob['format']) {
-		case 'jpeg':
-		case 'jpg':
-			header('Content-Type: image/jpeg');
-			break;
-			
-		case 'gif':
-			header('Content-Type: image/gif');
-			break;
-			
-		case 'png':
-			header('Content-Type: image/png');
-			break;
-			
-		case 'swf':
-			header('Content-Type: application/x-shockwave-flash');
-			break;
-			
-		default:
-			$filename=preg_replace('/[^A-Za-z0-9 _-]/', '-', $blob['filename']); // for compatibility with HTTP headers and all browsers
-			
-			header('Content-Type: application/octet-stream');
-			header('Content-Disposition: attachment; filename="'.$filename.'"');
-			break;
-	}	
+	qa_db_connect('qa_blob_db_fail_handler');
 	
-	echo $blob['content'];
+	$blob=qa_db_blob_read(qa_get('qa_blobid'));
+	
+	if (isset($blob)) {
+		header('Cache-Control: max-age=2592000, public'); // allows browsers and proxies to cache the blob
+	
+		switch ($blob['format']) {
+			case 'jpeg':
+			case 'jpg':
+				header('Content-Type: image/jpeg');
+				break;
+				
+			case 'gif':
+				header('Content-Type: image/gif');
+				break;
+				
+			case 'png':
+				header('Content-Type: image/png');
+				break;
+				
+			case 'swf':
+				header('Content-Type: application/x-shockwave-flash');
+				break;
+				
+			default:
+				$filename=preg_replace('/[^A-Za-z0-9 \\._-]/', '-', $blob['filename']); // for compatibility with HTTP headers and all browsers
+				
+				header('Content-Type: application/octet-stream');
+				header('Content-Disposition: attachment; filename="'.$filename.'"');
+				break;
+		}	
+	
+		echo $blob['content'];
+	
+	} else
+		header('HTTP/1.0 404 Not Found');
+
+	
+	qa_db_disconnect();
 
 
 /*

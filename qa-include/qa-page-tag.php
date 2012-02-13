@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-tag.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for page for a specific tag
 
 
@@ -32,17 +31,22 @@
 
 	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
+	require_once QA_INCLUDE_DIR.'qa-app-updates.php';
 	
-	$tag=@$pass_subrequests[0]; // picked up from qa-page.php
-	if (!strlen($tag))
-		qa_redirect('tags');
+	$tag=qa_request_part(1); // picked up from qa-page.php
+	$start=qa_get_start();
+	$userid=qa_get_logged_in_userid();
 
 
 //	Find the questions with this tag
 
-	list($questions, $qcount)=qa_db_select_with_pending(
-		qa_db_tag_recent_qs_selectspec($qa_login_userid, $tag, $qa_start),
-		qa_db_tag_count_qs_selectspec($tag)
+	if (!strlen($tag))
+		qa_redirect('tags');
+
+	@list($questions, $tagword, $favorite)=qa_db_select_with_pending(
+		qa_db_tag_recent_qs_selectspec($userid, $tag, $start, false, qa_opt_if_loaded('page_size_tag_qs')),
+		qa_db_tag_word_selectspec($tag),
+		isset($userid) ? qa_db_is_favorite_selectspec($userid, QA_ENTITY_TAG, $tag) : null
 	);
 	
 	$pagesize=qa_opt('page_size_tag_qs');
@@ -53,9 +57,13 @@
 //	Prepare content for theme
 	
 	$qa_content=qa_content_prepare(true);
-
+	
 	$qa_content['title']=qa_lang_html_sub('main/questions_tagged_x', qa_html($tag));
 	
+	if (isset($userid) && isset($tagword))
+		$qa_content['favorite']=qa_favorite_form(QA_ENTITY_TAG, $tagword['wordid'], $favorite,
+			qa_lang_sub($favorite ? 'main/remove_x_favorites' : 'main/add_tag_x_favorites', $tagword['word']));
+
 	if (!count($questions))
 		$qa_content['q_list']['title']=qa_lang_html('main/no_questions_found');
 
@@ -65,10 +73,10 @@
 
 	$qa_content['q_list']['qs']=array();
 	foreach ($questions as $postid => $question)
-		$qa_content['q_list']['qs'][]=qa_post_html_fields($question, $qa_login_userid, $qa_cookieid, $usershtml,
+		$qa_content['q_list']['qs'][]=qa_post_html_fields($question, $userid, qa_cookie_get(), $usershtml,
 			null, qa_post_html_defaults('Q'));
 		
-	$qa_content['page_links']=qa_html_page_links($qa_request, $qa_start, $pagesize, $qcount, qa_opt('pages_prev_next'));
+	$qa_content['page_links']=qa_html_page_links(qa_request(), $start, $pagesize, $tagword['tagcount'], qa_opt('pages_prev_next'));
 
 	if (empty($qa_content['page_links']))
 		$qa_content['suggest_next']=qa_html_suggest_qs_tags(true);

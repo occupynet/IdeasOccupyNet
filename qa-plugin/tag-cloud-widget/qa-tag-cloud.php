@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/tag-cloud-widget/qa-tag-cloud.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Widget module class for tag cloud plugin
 
 
@@ -36,6 +35,7 @@
 			elseif ($option=='tag_cloud_size_popular')
 				return true;
 		}
+
 		
 		function admin_form()
 		{
@@ -53,14 +53,16 @@
 				
 				'fields' => array(
 					array(
-						'label' => 'Number of tags to show:',
+						'label' => 'Maximum tags to show:',
 						'type' => 'number',
 						'value' => (int)qa_opt('tag_cloud_count_tags'),
+						'suffix' => 'tags',
 						'tags' => 'NAME="tag_cloud_count_tags_field"',
 					),
 
 					array(
-						'label' => 'Starting font size (in pixels):',
+						'label' => 'Starting font size:',
+						'suffix' => 'pixels',
 						'type' => 'number',
 						'value' => (int)qa_opt('tag_cloud_font_size'),
 						'tags' => 'NAME="tag_cloud_font_size_field"',
@@ -82,6 +84,7 @@
 				),
 			);
 		}
+
 		
 		function allow_template($template)
 		{
@@ -103,31 +106,34 @@
 				case 'users':
 				case 'search':
 				case 'admin':
+				case 'custom':
 					$allow=true;
 					break;
 			}
 			
 			return $allow;
 		}
+
 		
 		function allow_region($region)
 		{
 			return ($region=='side');
 		}
 		
+
 		function output_widget($region, $place, $themeobject, $template, $request, $qa_content)
 		{
 			require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 			
-			$populartags=qa_db_single_select(qa_db_popular_tags_selectspec(0, qa_opt('tag_cloud_count_tags')));
+			$populartags=qa_db_single_select(qa_db_popular_tags_selectspec(0, (int)qa_opt('tag_cloud_count_tags')));
 			
 			reset($populartags);
 			$maxcount=current($populartags);
 			
 			$themeobject->output(
-				'<DIV CLASS="qa-nav-cat-list qa-nav-cat-link" STYLE="margin:0;">',
+				'<H2 STYLE="margin-top:0; padding-top:0;">',
 				qa_lang_html('main/popular_tags'),
-				'</DIV>'
+				'</H2>'
 			);
 			
 			$themeobject->output('<DIV STYLE="font-size:10px;">');
@@ -145,7 +151,7 @@
 			$themeobject->output('</DIV>');
 		}
 	
-	};
+	}
 	
 
 /*

@@ -1,15 +1,14 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: index.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: A stub that only sets up the QA root and includes qa-index.php
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: A stub that only sets up the Q2A root and includes qa-index.php
 
 
 	This program is free software; you can redistribute it and/or

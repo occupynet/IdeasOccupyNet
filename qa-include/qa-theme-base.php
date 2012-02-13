@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-theme-base.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Default theme class, broken into lots of little functions for easy overriding
 
 
@@ -38,13 +37,15 @@
 	that extends this base class qa_html_theme_base. You can then override any of the methods below,
 	referring back to the default method using double colon (qa_html_theme_base::) notation.
 	
-	For more information and to see some example code, please consult the online QA documentation.
+	Plugins can also do something similar by using a layer. For more information and to see some example
+	code, please consult the online Q2A documentation.
 */
 
 	class qa_html_theme_base {
 	
 		var	$indent=0;
 		var $lines=0;
+		var $context=array();
 		
 		var $rooturl;
 		var $template;
@@ -69,7 +70,6 @@
 		track of indenting, although its actual output converts these to <tag> for W3C validation
 	*/
 		{
-			
 			foreach ($elements as $element) {
 				$delta=substr_count($element, '<')-substr_count($element, '<!')-2*substr_count($element, '</')-substr_count($element, '/>');
 				
@@ -91,7 +91,8 @@
 		Output each passed parameter on a separate line - see output_array() comments
 	*/
 		{
-			$this->output_array(func_get_args());
+			$args=func_get_args();
+			$this->output_array($args);
 		}
 
 		
@@ -123,9 +124,30 @@
 				'</'.$outertag.'>'
 			);
 		}
+		
+		
+		function set_context($key, $value)
+	/*
+		Set some context, which be accessed via $this->context for a function to know where it's being used on the page
+	*/
+		{
+			$this->context[$key]=$value;
+		}
+		
+		
+		function clear_context($key)
+	/*
+		Clear some context (used at the end of the appropriate loop)
+	*/
+		{
+			unset($this->context[$key]);
+		}
 
 		
 		function widgets($region, $place)
+	/*
+		Output the widgets (as provided in $this->content['widgets']) for $region and $place
+	*/
 		{
 			if (count(@$this->content['widgets'][$region][$place])) {
 				$this->output('<DIV CLASS="qa-widgets-'.$region.' qa-widgets-'.$region.'-'.$place.'">');
@@ -155,16 +177,16 @@
 		}
 
 		
+	//	From here on, we have a large number of class methods which output particular pieces of HTML markup
+	//	The calling chain is initiated from qa-page.php, or qa-ajax-*.php for refreshing parts of a page, 
+	//	For most HTML elements, the name of the function is similar to the element's CSS class, for example:
+	//	search() outputs <DIV CLASS="qa-search">, q_list() outputs <DIV CLASS="qa-q-list">, etc...
+
 		function doctype()
 		{
 			$this->output('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">');
 		}
 		
-	//	From here on, we have a large number of class methods which output particular pieces of HTML markup
-	//	The calling chain is initiated from qa-index.php, or qa-ajax-vote.php for refreshing the voting box
-	//	For most HTML elements, the name of the function is similar to the element's CSS class, for example:
-	//	search() outputs <DIV CLASS="qa-search">, q_list() outputs <DIV CLASS="qa-q-list">, etc...
-
 		function html()
 		{
 			$this->output(
@@ -223,6 +245,13 @@
 				
 			if (isset($this->content['feed']['url']))
 				$this->output('<LINK REL="alternate" TYPE="application/rss+xml" HREF="'.$this->content['feed']['url'].'" TITLE="'.@$this->content['feed']['label'].'"/>');
+				
+			if (isset($this->content['page_links']['items'])) // convert page links to rel=prev and rel=next tags
+				foreach ($this->content['page_links']['items'] as $page_link)
+					if ($page_link['type']=='prev')
+						$this->output('<LINK REL="prev" HREF="'.$page_link['url'].'"/>');
+					elseif ($page_link['type']=='next')
+						$this->output('<LINK REL="next" HREF="'.$page_link['url'].'"/>');
 		}
 		
 		function head_script()
@@ -239,6 +268,13 @@
 			if (isset($this->content['css_src']))
 				foreach ($this->content['css_src'] as $css_src)
 					$this->output('<LINK REL="stylesheet" TYPE="text/css" HREF="'.$css_src.'"/>');
+					
+			if (!empty($this->content['notices']))
+				$this->output(
+					'<STYLE><!--',
+					'.qa-body-js-on .qa-notice {display:none;}',
+					'//--></STYLE>'
+				);
 		}
 		
 		function css_name()
@@ -262,6 +298,8 @@
 			$this->body_tags();
 			$this->output('>');
 			
+			$this->body_script();
+			
 			if (isset($this->content['body_header']))
 				$this->output_raw($this->content['body_header']);
 				
@@ -273,9 +311,20 @@
 			$this->output('</BODY>');
 		}
 		
+		function body_script()
+		{
+			$this->output(
+				'<SCRIPT TYPE="text/javascript"><!--',
+				"var b=document.getElementsByTagName('body')[0];",
+				"b.className=b.className.replace('qa-body-js-off', 'qa-body-js-on');",
+				'//--></SCRIPT>'
+			);
+		}
+		
 		function body_content()
 		{
 			$this->body_prefix();
+			$this->notices();
 			
 			$this->output('<DIV CLASS="qa-body-wrapper">', '');
 
@@ -301,7 +350,7 @@
 				foreach ($this->content['categoryids'] as $categoryid)
 					$class.=' qa-category-'.qa_html($categoryid);
 			
-			$this->output('CLASS="'.$class.'"');
+			$this->output('CLASS="'.$class.' qa-body-js-off"');
 		}
 
 		function body_prefix()
@@ -310,6 +359,30 @@
 		function body_suffix()
 		{} // abstract method
 
+		function notices()
+		{
+			if (!empty($this->content['notices']))
+				foreach ($this->content['notices'] as $notice)
+					$this->notice($notice);
+		}
+		
+		function notice($notice)
+		{
+			$this->output('<DIV CLASS="qa-notice" ID="'.$notice['id'].'">');
+			
+			if (isset($notice['form_tags']))
+				$this->output('<FORM '.$notice['form_tags'].'>');
+			
+			$this->output_raw($notice['content']);
+			
+			$this->output('<INPUT '.$notice['close_tags'].' TYPE="submit" VALUE="X" CLASS="qa-notice-close-button"/> ');
+			
+			if (isset($notice['form_tags']))
+				$this->output('</FORM>');
+			
+			$this->output('</DIV>');
+		}		
+		
 		function header()
 		{
 			$this->output('<DIV CLASS="qa-header">');
@@ -376,7 +449,7 @@
 		{
 			$navigation=@$this->content['navigation'][$navtype];
 			
-			if (($navtype=='user') || !empty($navigation)) {
+			if (($navtype=='user') || isset($navigation)) {
 				$this->output('<DIV CLASS="qa-nav-'.$navtype.'">');
 				
 				if ($navtype=='user')
@@ -388,9 +461,11 @@
 						unset($navigation[$key]);
 						$navigation[$key]=$navlink;
 					}
-					
+				
+				$this->set_context('nav_type', $navtype);
 				$this->nav_list($navigation, 'nav-'.$navtype, $level);
 				$this->nav_clear($navtype);
+				$this->clear_context('nav_type');
 	
 				$this->output('</DIV>');
 			}
@@ -400,8 +475,16 @@
 		{
 			$this->output('<UL CLASS="qa-'.$class.'-list'.(isset($level) ? (' qa-'.$class.'-list-'.$level) : '').'">');
 
-			foreach ($navigation as $key => $navlink)
+			$index=0;
+			
+			foreach ($navigation as $key => $navlink) {
+				$this->set_context('nav_key', $key);
+				$this->set_context('nav_index', $index++);
 				$this->nav_item($key, $navlink, $class, $level);
+			}
+
+			$this->clear_context('nav_key');
+			$this->clear_context('nav_index');
 			
 			$this->output('</UL>');
 		}
@@ -432,6 +515,7 @@
 				$this->output(
 					'<A HREF="'.$navlink['url'].'" CLASS="qa-'.$class.'-link'.
 					(@$navlink['selected'] ? (' qa-'.$class.'-selected') : '').'"'.
+					(strlen(@$navlink['popup']) ? (' TITLE="'.$navlink['popup'].'"') : '').
 					(isset($navlink['target']) ? (' TARGET="'.$navlink['target'].'"') : '').'>'.$navlink['label'].
 					'</A>'
 				);
@@ -500,18 +584,17 @@
 			
 			$this->widgets('main', 'top');
 			
-			$this->page_title();			
-			$this->page_error();
+			$this->page_title_error();		
 			
 			$this->widgets('main', 'high');
 
-			if (isset($content['main_form_tags']))
-				$this->output('<FORM '.$content['main_form_tags'].'>');
+			/*if (isset($content['main_form_tags']))
+				$this->output('<FORM '.$content['main_form_tags'].'>');*/
 				
 			$this->main_parts($content);
 		
-			if (isset($content['main_form_tags']))
-				$this->output('</FORM>');
+			/*if (isset($content['main_form_tags']))
+				$this->output('</FORM>');*/
 				
 			$this->widgets('main', 'low');
 
@@ -523,18 +606,50 @@
 			$this->output('</DIV> <!-- END qa-main -->', '');
 		}
 		
-		function page_title()
+		function page_title_error()
 		{
 			$title=@$this->content['title'];
+			$favorite=@$this->content['favorite'];
 			
-			if (strlen($title))
-				$this->output('<H1>'.$title.'</H1>');
+			if (isset($favorite))
+				$this->output('<FORM '.$favorite['form_tags'].'>');
+				
+			$this->output('<H1>');
+
+			if (isset($favorite)) {
+				$this->output('<DIV CLASS="qa-favoriting" '.@$favorite['favorite_tags'].'>');
+				$this->favorite_inner_html($favorite);
+				$this->output('</DIV>');
+			}
+
+			if (isset($title))
+				$this->output($title);
+
+			if (isset($this->content['error'])) {
+				$this->output('</H1>');
+				$this->error(@$this->content['error']);
+			} else
+				$this->output('</H1>');
+
+			if (isset($favorite))
+				$this->output('</FORM>');
 		}
 		
-		function page_error()
+		function favorite_inner_html($favorite)
 		{
-			$error=@$this->content['error'];
-			
+			$this->favorite_button(@$favorite['favorite_add_tags'], 'qa-favorite');
+			$this->favorite_button(@$favorite['favorite_remove_tags'], 'qa-unfavorite');
+		}
+		
+		function favorite_button($tags, $class)
+		{
+			if (isset($tags))
+				$this->output('<INPUT '.$tags.' TYPE="submit" VALUE="" CLASS="'.$class.
+					'-button" onmouseover="this.className=\''.$class.'-hover\';" onmouseout="this.className=\''.$class.'-button\';"/> ');
+		}
+		
+		function error($error)
+		{
 			if (strlen($error))
 				$this->output(
 					'<DIV CLASS="qa-error">',
@@ -546,26 +661,39 @@
 		function main_parts($content)
 		{
 			foreach ($content as $key => $part) {
-				if (strpos($key, 'custom')===0)
-					$this->output_raw($part);
+				$this->set_context('part', $key);
+				$this->main_part($key, $part);
+			}
 
-				elseif (strpos($key, 'form')===0)
-					$this->form($part);
-					
-				elseif (strpos($key, 'q_list')===0)
-					$this->q_list_and_form($part);
+			$this->clear_context('part');
+		}
+		
+		function main_part($key, $part)
+		{
+			if (strpos($key, 'custom')===0)
+				$this->output_raw($part);
 
-				elseif (strpos($key, 'q_view')===0)
-					$this->q_view($part);
-					
-				elseif (strpos($key, 'a_list')===0)
-					$this->a_list($part);
-					
-				elseif (strpos($key, 'ranking')===0)
-					$this->ranking($part);
-					
-				elseif (strpos($key, 'nav_list')===0)
-					$this->nav_list($part['nav'], $part['type'], 1);
+			elseif (strpos($key, 'form')===0)
+				$this->form($part);
+				
+			elseif (strpos($key, 'q_list')===0)
+				$this->q_list_and_form($part);
+
+			elseif (strpos($key, 'q_view')===0)
+				$this->q_view($part);
+				
+			elseif (strpos($key, 'a_form')===0)
+				$this->a_form($part);
+			
+			elseif (strpos($key, 'a_list')===0)
+				$this->a_list($part);
+				
+			elseif (strpos($key, 'ranking')===0)
+				$this->ranking($part);
+				
+			elseif (strpos($key, 'nav_list')===0) {
+				$this->section(@$part['title']);		
+				$this->nav_list($part['nav'], $part['type'], 1);
 			}
 		}
 		
@@ -673,11 +801,16 @@
 		function form_fields($form, $columns)
 		{
 			if (!empty($form['fields'])) {
-				foreach ($form['fields'] as $field)
+				foreach ($form['fields'] as $key => $field) {
+					$this->set_context('field_key', $key);
+					
 					if (@$field['type']=='blank')
 						$this->form_spacer($form, $columns);
 					else
 						$this->form_field_rows($form, $columns, $field);
+				}
+						
+				$this->clear_context('field_key');
 			}
 		}
 		
@@ -757,10 +890,13 @@
 				if ($showfield)
 					$this->form_field($field, $style);
 	
-				if (!empty($field['error']))
+				if (!empty($field['error'])) {
+					if (@$field['note_force'])
+						$this->form_note($field, $style, $columns);
+						
 					$this->form_error($field, $style, $columns);
 				
-				elseif (!empty($field['note']))
+				} elseif (!empty($field['note']))
 					$this->form_note($field, $style, $columns);
 				
 				$this->output('</TD>');
@@ -810,13 +946,15 @@
 					else
 						$this->form_text_single_row($field, $style);
 					break;
-			}
+			}	
+
+			$this->form_suffix($field, $style);
 		}
 		
 		function form_buttons($form, $columns)
 		{
 			if (!empty($form['buttons'])) {
-				$style=$form['style'];
+				$style=@$form['style'];
 				
 				if ($columns)
 					$this->output(
@@ -825,10 +963,18 @@
 					);
 
 				foreach ($form['buttons'] as $key => $button) {
-					$this->form_button_data($button, $key, $style);
-					$this->form_button_note($button, $style);
+					$this->set_context('button_key', $key);
+					
+					if (empty($button))
+						$this->form_button_spacer($style);
+					else {
+						$this->form_button_data($button, $key, $style);
+						$this->form_button_note($button, $style);
+					}
 				}
 	
+				$this->clear_context('button_key');
+
 				if ($columns)
 					$this->output(
 						'</TD>',
@@ -842,7 +988,8 @@
 			$baseclass='qa-form-'.$style.'-button qa-form-'.$style.'-button-'.$key;
 			$hoverclass='qa-form-'.$style.'-hover qa-form-'.$style.'-hover-'.$key;
 			
-			$this->output('<INPUT'.rtrim(' '.@$button['tags']).' VALUE="'.@$button['label'].'" TITLE="'.@$button['popup'].'" TYPE="submit" CLASS="'.$baseclass.'" onmouseover="this.className=\''.$hoverclass.'\';" onmouseout="this.className=\''.$baseclass.'\';"/>');
+			$this->output('<INPUT'.rtrim(' '.@$button['tags']).' VALUE="'.@$button['label'].'" TITLE="'.@$button['popup'].'" TYPE="submit"'.
+				(isset($style) ? (' CLASS="'.$baseclass.'" onmouseover="this.className=\''.$hoverclass.'\';" onmouseout="this.className=\''.$baseclass.'\';"') : '').'/>');
 		}
 		
 		function form_button_note($button, $style)
@@ -856,6 +1003,11 @@
 				);
 		}
 		
+		function form_button_spacer($style)
+		{
+			$this->output('<SPAN CLASS="qa-form-'.$style.'-buttons-spacer">&nbsp;</SPAN>');
+		}
+		
 		function form_hidden($form)
 		{
 			if (!empty($form['hidden']))
@@ -867,6 +1019,12 @@
 		{
 			if (!empty($field['prefix']))
 				$this->output('<SPAN CLASS="qa-form-'.$style.'-prefix">'.$field['prefix'].'</SPAN>');
+		}
+		
+		function form_suffix($field, $style)
+		{
+			if (!empty($field['suffix']))
+				$this->output('<SPAN CLASS="qa-form-'.$style.'-suffix">'.$field['suffix'].'</SPAN>');
 		}
 		
 		function form_checkbox($field, $style)
@@ -937,7 +1095,7 @@
 		{
 			$tag=($columns>1) ? 'SPAN' : 'DIV';
 			
-			$this->output('<'.$tag.' CLASS="qa-form-'.$style.'-note">'.$field['note'].'</'.$tag.'>');
+			$this->output('<'.$tag.' CLASS="qa-form-'.$style.'-note">'.@$field['note'].'</'.$tag.'>');
 		}
 		
 		function ranking($ranking)
@@ -954,31 +1112,35 @@
 				$columns=ceil(count($ranking['items'])/$rows);
 				
 				for ($row=0; $row<$rows; $row++) {
+					$this->set_context('ranking_row', $row);
 					$this->output('<TR>');
 		
-					for ($column=0; $column<$columns; $column++)
+					for ($column=0; $column<$columns; $column++) {
+						$this->set_context('ranking_column', $column);
 						$this->ranking_item(@$ranking['items'][$column*$rows+$row], $class, $column>0);
+					}
+
+					$this->clear_context('ranking_column');
 		
 					$this->output('</TR>');
 				}
 			
+				$this->clear_context('ranking_row');
+
 				$this->output('</TABLE>');
 			}
 		}
 		
 		function ranking_item($item, $class, $spacer)
 		{
+			if ($spacer)
+				$this->ranking_spacer($class);
+			
 			if (empty($item)) {
-				if ($spacer)
-					$this->ranking_spacer($class);
-
 				$this->ranking_spacer($class);
 				$this->ranking_spacer($class);
 			
 			} else {
-				if ($spacer)
-					$this->ranking_spacer($class);
-				
 				if (isset($item['count']))
 					$this->ranking_count($item, $class);
 					
@@ -1038,45 +1200,50 @@
 		
 		function q_list($q_list)
 		{
-			$this->output('<DIV CLASS="qa-q-list">', '');
-			
-			foreach ($q_list['qs'] as $question)
-				$this->q_list_item($question);
-
-			$this->output('</DIV> <!-- END qa-q-list -->', '');
+			if (isset($q_list['qs'])) {
+				$this->output('<DIV CLASS="qa-q-list">', '');
+				
+				foreach ($q_list['qs'] as $q_item)
+					$this->q_list_item($q_item);
+	
+				$this->output('</DIV> <!-- END qa-q-list -->', '');
+			}
 		}
 		
-		function q_list_item($question)
+		function q_list_item($q_item)
 		{
-			$this->output('<DIV CLASS="qa-q-list-item qa-q-list-item-'.str_replace(' ','-',@$question['who']['level']).rtrim(' '.@$question['classes']).'" '.@$question['tags'].'>');
+			$this->output('<DIV CLASS="qa-q-list-item'.rtrim(' '.@$q_item['classes']).'" '.@$q_item['tags'].'>');
 
-			$this->q_item_stats($question);
-			$this->q_item_main($question);
+			$this->q_item_stats($q_item);
+			$this->q_item_main($q_item);
 			$this->q_item_clear();
 
 			$this->output('</DIV> <!-- END qa-q-list-item -->', '');
 		}
 		
-		function q_item_stats($question)
+		function q_item_stats($q_item)
 		{
 			$this->output('<DIV CLASS="qa-q-item-stats">');
 			
-			$this->voting($question);
-			$this->a_count($question);
+			$this->voting($q_item);
+			$this->a_count($q_item);
 
 			$this->output('</DIV>');
 		}
 		
-		function q_item_main($question)
+		function q_item_main($q_item)
 		{
-			$this->output('<DIV CLASS="qa-q-item-main ">');
+			$this->output('<DIV CLASS="qa-q-item-main">');
 			
-			$this->view_count($question);
-			$this->q_item_title($question);
-			$this->post_avatar($question, 'qa-q-item');
-			$this->post_meta($question, 'qa-q-item');
-			$this->post_tags($question, 'qa-q-item');
+			$this->view_count($q_item);
+			$this->q_item_title($q_item);
+			$this->q_item_content($q_item);
 			
+			$this->post_avatar($q_item, 'qa-q-item');
+			$this->post_meta($q_item, 'qa-q-item');
+			$this->post_tags($q_item, 'qa-q-item');
+			$this->q_item_buttons($q_item);
+				
 			$this->output('</DIV>');
 		}
 		
@@ -1088,13 +1255,32 @@
 			);
 		}
 		
-		function q_item_title($question)
+		function q_item_title($q_item)
 		{
 			$this->output(
 				'<DIV CLASS="qa-q-item-title">',
-				'<A HREF="'.$question['url'].'">'.$question['title'].'</A>',
+				'<A HREF="'.$q_item['url'].'">'.$q_item['title'].'</A>',
 				'</DIV>'
 			);
+		}
+		
+		function q_item_content($q_item)
+		{
+			if (!empty($q_item['content']))
+				$this->output(
+					'<DIV CLASS="qa-q-item-content">',
+					$q_item['content'],
+					'</DIV>'
+				);
+		}
+		
+		function q_item_buttons($q_item)
+		{
+			if (!empty($q_item['form'])) {
+				$this->output('<DIV CLASS="qa-q-item-buttons">');
+				$this->form($q_item['form']);
+				$this->output('</DIV>');
+			}
 		}
 		
 		function voting($post)
@@ -1135,6 +1321,11 @@
 					$this->post_disabled_button($post, 'vote_down_tags', '&ndash;', 'qa-vote-one-button qa-vote-down');
 					break;
 					
+				case 'up_only':
+					$this->post_hover_button($post, 'vote_up_tags', '+', 'qa-vote-first-button qa-vote-up');
+					$this->post_disabled_button($post, 'vote_down_tags', '', 'qa-vote-second-button qa-vote-down');
+					break;
+				
 				case 'enabled':
 					$this->post_hover_button($post, 'vote_up_tags', '+', 'qa-vote-first-button qa-vote-up');
 					$this->post_hover_button($post, 'vote_down_tags', '&ndash;', 'qa-vote-second-button qa-vote-down');
@@ -1265,13 +1456,17 @@
 				
 			$this->post_meta_flags($post, $class);
 			
-			if (!empty($post['when_2'])) {
+			if (!empty($post['what_2'])) {
 				$this->output($separator);
 				
 				foreach ($order as $element)
 					switch ($element) {
+						case 'what':
+							$this->output('<SPAN CLASS="'.$class.'-what">'.$post['what_2'].'</SPAN>');
+							break;
+						
 						case 'when':
-							$this->output_split($post['when_2'], $class.'-when');
+							$this->output_split(@$post['when_2'], $class.'-when');
 							break;
 						
 						case 'who':
@@ -1387,12 +1582,17 @@
 			if (!empty($page_items)) {
 				$this->output('<UL CLASS="qa-page-links-list">');
 				
+				$index=0;
+				
 				foreach ($page_items as $page_link) {
+					$this->set_context('page_index', $index++);
 					$this->page_links_item($page_link);
 					
 					if ($page_link['ellipsis'])
 						$this->page_links_item(array('type' => 'ellipsis'));
 				}
+				
+				$this->clear_context('page_index');
 				
 				$this->output('</UL>');
 			}
@@ -1456,7 +1656,10 @@
 		{
 			if (!empty($q_view)) {
 				$this->output('<DIV CLASS="qa-q-view'.(@$q_view['hidden'] ? ' qa-q-view-hidden' : '').rtrim(' '.@$q_view['classes']).'"'.rtrim(' '.@$q_view['tags']).'>');
-	
+				
+				if (isset($q_view['main_form_tags']))
+					$this->output('<FORM '.$q_view['main_form_tags'].'>'); // form to start before voting buttons
+				
 				$this->voting($q_view);
 				$this->a_count($q_view);
 				$this->q_view_main($q_view);
@@ -1468,18 +1671,22 @@
 		
 		function q_view_main($q_view)
 		{
-			$this->output('<DIV CLASS="qa-q-view-main qa-q-view-main-'.str_replace(' ','-',@$q_view['who']['level']).'">');
+			$this->output('<DIV CLASS="qa-q-view-main">');
 
 			$this->q_view_content($q_view);
+			$this->q_view_extra($q_view);
 			$this->q_view_follows($q_view);
+			$this->q_view_closed($q_view);
 			$this->post_tags($q_view, 'qa-q-view');
 			$this->post_avatar($q_view, 'qa-q-view');
 			$this->post_meta($q_view, 'qa-q-view');
 			$this->q_view_buttons($q_view);
 			$this->c_list(@$q_view['c_list'], 'qa-q-view');
-			$this->form(@$q_view['a_form']);
-			$this->c_list(@$q_view['a_form']['c_list'], 'qa-a-item');
-			$this->form(@$q_view['c_form']);
+			
+			if (isset($q_view['main_form_tags']))
+				$this->output('</FORM>'); // form ends just before comment form (breaks nesting)
+			
+			$this->c_form(@$q_view['c_form']);
 			
 			$this->output('</DIV> <!-- END qa-q-view-main -->');
 		}
@@ -1505,6 +1712,35 @@
 				);
 		}
 		
+		function q_view_closed($q_view)
+		{
+			if (!empty($q_view['closed'])) {
+				$haslink=isset($q_view['closed']['url']);
+				
+				$this->output(
+					'<DIV CLASS="qa-q-view-closed">',
+					$q_view['closed']['label'],
+					($haslink ? ('<A HREF="'.$q_view['closed']['url'].'"') : '<SPAN').' CLASS="qa-q-view-closed-content">',
+					$q_view['closed']['content'],
+					$haslink ? '</A>' : '</SPAN>',
+					'</DIV>'
+				);
+			}
+		}
+		
+		function q_view_extra($q_view)
+		{
+			if (!empty($q_view['extra']))
+				$this->output(
+					'<DIV CLASS="qa-q-view-extra">',
+					$q_view['extra']['label'],
+					'<SPAN CLASS="qa-q-view-extra-content">',
+					$q_view['extra']['content'],
+					'</SPAN>',
+					'</DIV>'
+				);
+		}
+		
 		function q_view_buttons($q_view)
 		{
 			if (!empty($q_view['form'])) {
@@ -1522,13 +1758,24 @@
 			);
 		}
 		
+		function a_form($a_form)
+		{
+			$this->output('<DIV CLASS="qa-a-form"'.(isset($a_form['id']) ? (' ID="'.$a_form['id'].'"') : '').
+				(@$a_form['collapse'] ? ' STYLE="display:none;"' : '').'>');
+
+			$this->form($a_form);
+			$this->c_list(@$a_form['c_list'], 'qa-a-item');
+			
+			$this->output('</DIV> <!-- END qa-a-form -->', '');
+		}
+		
 		function a_list($a_list)
 		{
 			if (!empty($a_list)) {
 				$this->section(@$a_list['title']);
 				
-				$this->output('<DIV CLASS="qa-a-list">', '');
-					
+				$this->output('<DIV CLASS="qa-a-list" '.@$a_list['tags'].'>', '');
+				
 				foreach ($a_list['as'] as $a_item)
 					$this->a_list_item($a_item);
 				
@@ -1540,7 +1787,10 @@
 		{
 			$extraclass=@$a_item['classes'].($a_item['hidden'] ? ' qa-a-list-item-hidden' : ($a_item['selected'] ? ' qa-a-list-item-selected' : ''));
 			
-			$this->output('<DIV CLASS="qa-a-list-item qa-a-list-item-'.str_replace(' ','-',@$a_item['who']['level'])." ".$extraclass.'" '.@$a_item['tags'].'>');
+			$this->output('<DIV CLASS="qa-a-list-item '.$extraclass.'" '.@$a_item['tags'].'>');
+			
+			if (isset($a_item['main_form_tags']))
+				$this->output('<FORM '.$a_item['main_form_tags'].'>'); // form to start before voting buttons
 			
 			$this->voting($a_item);
 			$this->a_item_main($a_item);
@@ -1559,17 +1809,22 @@
 				$this->output('<DIV CLASS="qa-a-item-selected">');
 
 			$this->a_selection($a_item);
+			$this->error(@$a_item['error']);
 			$this->a_item_content($a_item);
 			$this->post_avatar($a_item, 'qa-a-item');
 			$this->post_meta($a_item, 'qa-a-item');
-			$this->a_item_clear();
 			
 			if ($a_item['hidden'] || $a_item['selected'])
 				$this->output('</DIV>');
 			
 			$this->a_item_buttons($a_item);
+			
 			$this->c_list(@$a_item['c_list'], 'qa-a-item');
-			$this->form(@$a_item['c_form']);
+
+			if (isset($a_item['main_form_tags']))
+				$this->output('</FORM>'); // form ends just before comment form (breaks nesting)
+
+			$this->c_form(@$a_item['c_form']);
 
 			$this->output('</DIV> <!-- END qa-a-item-main -->');
 		}
@@ -1600,12 +1855,22 @@
 			}
 		}
 		
+		function c_form($c_form)
+		{
+			$this->output('<DIV CLASS="qa-c-form"'.(isset($c_form['id']) ? (' ID="'.$c_form['id'].'"') : '').
+				(@$c_form['collapse'] ? ' STYLE="display:none;"' : '').'>');
+
+			$this->form($c_form);
+			
+			$this->output('</DIV> <!-- END qa-c-form -->', '');
+		}
+		
 		function c_list($c_list, $class)
 		{
 			if (!empty($c_list)) {
-				$this->output('', '<DIV CLASS="'.$class.'-c-list">');
-					
-				foreach ($c_list as $c_item)
+				$this->output('', '<DIV CLASS="'.$class.'-c-list"'.(@$c_list['hidden'] ? ' STYLE="display:none;"' : '').' '.@$c_list['tags'].'>');
+				
+				foreach ($c_list['cs'] as $c_item)
 					$this->c_list_item($c_item);
 				
 				$this->output('</DIV> <!-- END qa-c-list -->', '');
@@ -1614,17 +1879,23 @@
 		
 		function c_list_item($c_item)
 		{
-			$extraclass=@$c_item['classes'].($c_item['hidden'] ? ' qa-c-item-hidden' : '');
+			$extraclass=@$c_item['classes'].(@$c_item['hidden'] ? ' qa-c-item-hidden' : '');
 			
-			$this->output('<DIV CLASS="qa-c-list-item qa-c-list-item-'.str_replace(' ','-',@$c_item['who']['level'])." ".$extraclass.'" '.@$c_item['tags'].'>');
+			$this->output('<DIV CLASS="qa-c-list-item '.$extraclass.'" '.@$c_item['tags'].'>');
+
 			$this->c_item_main($c_item);
 			$this->c_item_clear();
+
 			$this->output('</DIV> <!-- END qa-c-item -->');
 		}
 		
 		function c_item_main($c_item)
 		{
-			if (isset($c_item['url']))
+			$this->error(@$c_item['error']);
+
+			if (isset($c_item['expand_tags']))
+				$this->c_item_expand($c_item);
+			elseif (isset($c_item['url']))
 				$this->c_item_link($c_item);
 			else
 				$this->c_item_content($c_item);
@@ -1643,6 +1914,13 @@
 			);
 		}
 		
+		function c_item_expand($c_item)
+		{
+			$this->output(
+				'<A HREF="'.$c_item['url'].'" '.$c_item['expand_tags'].' CLASS="qa-c-item-expand">'.$c_item['title'].'</A>'
+			);
+		}
+
 		function c_item_content($c_item)
 		{
 			$this->output(

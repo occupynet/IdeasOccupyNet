@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Routing and utility functions for page requests
 
 
@@ -25,7 +24,6 @@
 	More about this license: http://www.question2answer.org/license.php
 */
 
-
 	if (!defined('QA_VERSION')) { // don't allow this page to be requested directly from browser
 		header('Location: ../');
 		exit;
@@ -35,186 +33,222 @@
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
 	require_once QA_INCLUDE_DIR.'qa-app-users.php';
 	require_once QA_INCLUDE_DIR.'qa-app-options.php';
+	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 
 
-//	Memory/CPU usage tracking
+//	Functions which are called at the bottom of this file
+
+	function qa_page_db_fail_handler($type, $errno=null, $error=null, $query=null)
+/*
+	Standard database failure handler function which bring up the install/repair/upgrade page
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		$pass_failure_type=$type;
+		$pass_failure_errno=$errno;
+		$pass_failure_error=$error;
+		$pass_failure_query=$query;
+		
+		require QA_INCLUDE_DIR.'qa-install.php';
+		
+		qa_exit('error');
+	}
 	
-	if (QA_DEBUG_PERFORMANCE) {
-		require_once QA_INCLUDE_DIR.'qa-util-debug.php';
-		qa_usage_init();
+	
+	function qa_page_queue_pending()
+/*
+	Queue any pending requests which are required independent of which page will be shown
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		qa_preload_options();
+		$loginuserid=qa_get_logged_in_userid();
+		
+		if (isset($loginuserid)) {
+			if (!QA_FINAL_EXTERNAL_USERS)
+				qa_db_queue_pending_select('loggedinuser', qa_db_user_account_selectspec($loginuserid, true));
+				
+			qa_db_queue_pending_select('notices', qa_db_user_notices_selectspec($loginuserid));
+		}
+	
+		qa_db_queue_pending_select('navpages', qa_db_pages_selectspec(array('B', 'M', 'O', 'F')));
+		qa_db_queue_pending_select('widgets', qa_db_widgets_selectspec());
 	}
 
-	
-//	Connect to database
 
-	qa_base_db_connect('qa_page_db_fail_handler');
-
-
-//	Get common parameters, queue some database information for retrieval and get the ID/cookie of the current user (if any)
-
-	$qa_start=min(max(0, (int)qa_get('start')), QA_MAX_LIMIT_START);
-	$qa_state=qa_get('state');
-	unset($_GET['state']); // to prevent being passed through on forms
-
-	$qa_nav_pages_pending=true;
-	$qa_widgets_pending=true;
-	$qa_logged_in_pending=true;
-
-	$qa_login_userid=qa_get_logged_in_userid();
-	$qa_cookieid=qa_cookie_get();
-	
-
-// 	If not currently logged in as anyone, see if any of the registered login modules can help
-	
-	if (!isset($qa_login_userid)) {
-		$modulenames=qa_list_modules('login');
+	function qa_load_state()
+/*
+	Check the page state parameter and then remove it from the $_GET array
+*/
+	{
+		global $qa_state;
 		
-		foreach ($modulenames as $tryname) {
-			$module=qa_load_module('login', $tryname);
-			
-			if (method_exists($module, 'check_login')) {
-				$module->check_login();
-				$qa_login_userid=qa_get_logged_in_userid();
+		$qa_state=qa_get('state');
+		unset($_GET['state']); // to prevent being passed through on forms
+	}
 	
-				if (isset($qa_login_userid)) // stop and reload page if it worked
-					qa_redirect($qa_request, $_GET);
+	
+	function qa_check_login_modules()
+/*
+	If no user is logged in, call through to the login modules to see if they want to log someone in
+*/
+	{
+		if (!qa_is_logged_in()) {
+			$loginmodules=qa_load_modules_with('login', 'check_login');
+
+			foreach ($loginmodules as $loginmodule) {
+				$loginmodule->check_login();
+				if (qa_is_logged_in()) // stop and reload page if it worked
+					qa_redirect(qa_request(), $_GET);
 			}
 		}
 	}
-
 	
-//	End of setup phase
 
-	if (QA_DEBUG_PERFORMANCE)
-		qa_usage_mark('setup');
-
-	
-//	Process any incoming votes
-
-	if (qa_is_http_post())
-		foreach ($_POST as $field => $value)
-			if (strpos($field, 'vote_')===0) {
-				@list($dummy, $postid, $vote, $anchor)=explode('_', $field);
-				
-				if (isset($postid) && isset($vote)) {
-					require_once QA_INCLUDE_DIR.'qa-app-votes.php';
-					require_once QA_INCLUDE_DIR.'qa-db-selects.php';
+	function qa_check_page_clicks()
+/*
+	React to any of the common buttons on a page for voting, favorites and closing a notice
+	If the user has Javascript on, these should come through Ajax rather than here.
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		global $qa_vote_error_html;
+		
+		if (qa_is_http_post())
+			foreach ($_POST as $field => $value) {
+				if (strpos($field, 'vote_')===0) { // voting...
+					@list($dummy, $postid, $vote, $anchor)=explode('_', $field);
 					
-					$post=qa_db_select_with_pending(qa_db_full_post_selectspec($qa_login_userid, $postid));
-					$qa_vote_error_html=qa_vote_error_html($post, $qa_login_userid, $qa_request);
-
-					if (!$qa_vote_error_html) {
-						qa_vote_set($post, $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, $vote);
-						qa_redirect($qa_request, $_GET, null, null, $anchor);
+					if (isset($postid) && isset($vote)) {
+						require_once QA_INCLUDE_DIR.'qa-app-votes.php';
+						require_once QA_INCLUDE_DIR.'qa-db-selects.php';
+						
+						$userid=qa_get_logged_in_userid();
+						
+						$post=qa_db_select_with_pending(qa_db_full_post_selectspec($userid, $postid));
+						$qa_vote_error_html=qa_vote_error_html($post, $vote, $userid, qa_request());
+	
+						if (!$qa_vote_error_html) {
+							qa_vote_set($post, $userid, qa_get_logged_in_handle(), qa_cookie_get(), $vote);
+							qa_redirect(qa_request(), $_GET, null, null, $anchor);
+						}
+						break;
 					}
-					break;
+				
+				} elseif (strpos($field, 'favorite_')===0) { // favorites...
+					@list($dummy, $entitytype, $entityid, $favorite)=explode('_', $field);
+					
+					if (isset($entitytype) && isset($entityid) && isset($favorite)) {
+						require_once QA_INCLUDE_DIR.'qa-app-favorites.php';
+						
+						qa_user_favorite_set(qa_get_logged_in_userid(), qa_get_logged_in_handle(), qa_cookie_get(), $entitytype, $entityid, $favorite);
+						qa_redirect(qa_request(), $_GET);
+					}
+					
+				} elseif (strpos($field, 'notice_')===0) { // notices...
+					@list($dummy, $noticeid)=explode('_', $field);
+					
+					if (isset($noticeid)) {
+						if ($noticeid=='visitor')
+							setcookie('qa_noticed', 1, time()+86400*3650, '/', QA_COOKIE_DOMAIN);
+						
+						elseif ($noticeid=='welcome') {
+							require_once QA_INCLUDE_DIR.'qa-db-users.php';
+							qa_db_user_set_flag(qa_get_logged_in_userid(), QA_USER_FLAGS_WELCOME_NOTICE, false);
+
+						} else {
+							require_once QA_INCLUDE_DIR.'qa-db-notices.php';
+							qa_db_usernotice_delete(qa_get_logged_in_userid(), $noticeid);
+						}
+
+						qa_redirect(qa_request(), $_GET);
+					}
 				}
 			}
-
-
-//	Otherwise include the appropriate PHP file for the page in the request
-
-	$QA_CONST_ROUTING=array(
-		'account' => QA_INCLUDE_DIR.'qa-page-account.php',
-		'activity/' => QA_INCLUDE_DIR.'qa-page-activity.php',
-		'admin' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/categories' => QA_INCLUDE_DIR.'qa-page-admin-categories.php',
-		'admin/emails' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/feeds' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/hidden' => QA_INCLUDE_DIR.'qa-page-admin-hidden.php',
-		'admin/layout' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/layoutwidgets' => QA_INCLUDE_DIR.'qa-page-admin-widgets.php',
-		'admin/lists' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/pages' => QA_INCLUDE_DIR.'qa-page-admin-pages.php',
-		'admin/permissions' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/plugins' => QA_INCLUDE_DIR.'qa-page-admin-plugins.php',
-		'admin/points' => QA_INCLUDE_DIR.'qa-page-admin-points.php',
-		'admin/posting' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/recalc' => QA_INCLUDE_DIR.'qa-page-admin-recalc.php',
-		'admin/spam' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/stats' => QA_INCLUDE_DIR.'qa-page-admin-stats.php',
-		'admin/userfields' => QA_INCLUDE_DIR.'qa-page-admin-userfields.php',
-		'admin/users' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'admin/usertitles' => QA_INCLUDE_DIR.'qa-page-admin-usertitles.php',
-		'admin/viewing' => QA_INCLUDE_DIR.'qa-page-admin.php',
-		'answers/' => QA_INCLUDE_DIR.'qa-page-answers.php',
-		'ask' => QA_INCLUDE_DIR.'qa-page-ask.php',
-		'categories/' => QA_INCLUDE_DIR.'qa-page-categories.php',
-		'comments/' => QA_INCLUDE_DIR.'qa-page-comments.php',
-		'confirm' => QA_INCLUDE_DIR.'qa-page-confirm.php',
-		'feedback' => QA_INCLUDE_DIR.'qa-page-feedback.php',
-		'forgot' => QA_INCLUDE_DIR.'qa-page-forgot.php',
-		'hot' => QA_INCLUDE_DIR.'qa-page-hot.php',
-		'ip/' => QA_INCLUDE_DIR.'qa-page-ip.php',
-		'login' => QA_INCLUDE_DIR.'qa-page-login.php',
-		'logout' => QA_INCLUDE_DIR.'qa-page-logout.php',
-		'message/' => QA_INCLUDE_DIR.'qa-page-message.php',
-		'questions/' => QA_INCLUDE_DIR.'qa-page-questions.php',
-		'register' => QA_INCLUDE_DIR.'qa-page-register.php',
-		'reset' => QA_INCLUDE_DIR.'qa-page-reset.php',
-		'search' => QA_INCLUDE_DIR.'qa-page-search.php',
-		'tag/' => QA_INCLUDE_DIR.'qa-page-tag.php',
-		'tags' => QA_INCLUDE_DIR.'qa-page-tags.php',
-		'unanswered/' => QA_INCLUDE_DIR.'qa-page-unanswered.php',
-		'user/' => QA_INCLUDE_DIR.'qa-page-user.php',
-		'users' => QA_INCLUDE_DIR.'qa-page-users.php',
-		'users/blocked' => QA_INCLUDE_DIR.'qa-page-users-blocked.php',
-		'users/special' => QA_INCLUDE_DIR.'qa-page-users-special.php',
-	);
-
-	if (!isset($qa_content)) {
-		if (isset($QA_CONST_ROUTING[$qa_request_lc])) {
-			if ($qa_request_lc_parts[0]=='admin') {
-				$_COOKIE['qa_admin_last']=$qa_request_lc; // for navigation tab now...
-				setcookie('qa_admin_last', $_COOKIE['qa_admin_last'], 0, '/', QA_COOKIE_DOMAIN); // ...and in future
-			}
-			
-			$qa_template=$qa_request_lc_parts[0];
-			$qa_content=require $QA_CONST_ROUTING[$qa_request_lc];
+	}
 	
-		} elseif (isset($QA_CONST_ROUTING[$qa_request_lc_parts[0].'/'])) {
-			$pass_subrequests=array_slice($qa_request_parts, 1); // effectively a parameter that is passed to file
-			$qa_template=$qa_request_lc_parts[0];
-			$qa_content=require $QA_CONST_ROUTING[$qa_request_lc_parts[0].'/'];
+
+	function qa_get_request_content()
+/*
+	Run the appropriate qa-page-*.php file for this request and return back the $qa_content it passed 
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		$requestlower=strtolower(qa_request());
+		$requestparts=qa_request_parts();
+		$firstlower=strtolower($requestparts[0]);
+		$routing=qa_page_routing();
+		
+		if (isset($routing[$requestlower])) {
+			qa_set_template($firstlower);
+			$qa_content=require QA_INCLUDE_DIR.$routing[$requestlower];
+	
+		} elseif (isset($routing[$firstlower.'/'])) {
+			qa_set_template($firstlower);
+			$qa_content=require QA_INCLUDE_DIR.$routing[$firstlower.'/'];
 			
-		} elseif (is_numeric($qa_request_parts[0])) {
-			$pass_questionid=$qa_request_parts[0]; // effectively a parameter that is passed to file
-			$qa_template='question';
+		} elseif (is_numeric($requestparts[0])) {
+			qa_set_template('question');
 			$qa_content=require QA_INCLUDE_DIR.'qa-page-question.php';
 	
 		} else {
-			$qa_template=strlen($qa_request_lc_parts[0]) ? $qa_request_lc_parts[0] : 'qa';
+			qa_set_template(strlen($firstlower) ? $firstlower : 'qa'); // will be changed later
 			$qa_content=require QA_INCLUDE_DIR.'qa-page-default.php'; // handles many other pages, including custom pages and page modules
 		}
+	
+		if ($firstlower=='admin') {
+			$_COOKIE['qa_admin_last']=$requestlower; // for navigation tab now...
+			setcookie('qa_admin_last', $_COOKIE['qa_admin_last'], 0, '/', QA_COOKIE_DOMAIN); // ...and in future
+		}
+
+		return $qa_content;
 	}
-	
-	
-//	End of view phase
 
-	if (QA_DEBUG_PERFORMANCE)
-		qa_usage_mark('view');
 	
-
-//	Output the content if there is any
-	
-	if (is_array($qa_content)) {
-	
+	function qa_output_content($qa_content)
+/*
+	Output the $qa_content via the theme class after doing some pre-processing, mainly relating to Javascript
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		global $qa_template;
+		
+		$requestlower=strtolower(qa_request());
+		
 	//	Set appropriate selected flags for navigation (not done in qa_content_prepare() since it also applies to sub-navigation)
+		
+		$selfpathhtml=qa_path_html($requestlower);
 		
 		foreach ($qa_content['navigation'] as $navtype => $navigation)
 			if (is_array($navigation) && ($navtype!='cat'))
 				foreach ($navigation as $navprefix => $navlink)
-					if (substr($qa_request_lc.'$', 0, strlen($navprefix)) == $navprefix)
+					if (
+						(substr($requestlower.'$', 0, strlen($navprefix)) == $navprefix) ||
+						(strtolower(@$navlink['url'])==$selfpathhtml) // this check is needed for custom links that go to Q2A pages
+					)
 						$qa_content['navigation'][$navtype][$navprefix]['selected']=true;
 	
+	//	Slide down notifications
+	
+		if (!empty($qa_content['notices']))
+			foreach ($qa_content['notices'] as $notice) {
+				$qa_content['script_onloads'][]=array(
+					"qa_reveal(document.getElementById(".qa_js($notice['id'])."), 'notice');",
+				);
+			}
 	
 	//	Handle maintenance mode
 	
-		if (qa_opt('site_maintenance') && ($qa_request_lc!='login')) {
+		if (qa_opt('site_maintenance') && ($requestlower!='login')) {
 			if (qa_get_logged_in_level()>=QA_USER_LEVEL_ADMIN) {
 				if (!isset($qa_content['error']))
 					$qa_content['error']=strtr(qa_lang_html('admin/maintenance_admin_only'), array(
-						'^1' => '<A HREF="'.qa_path_html('admin').'">',
+						'^1' => '<A HREF="'.qa_path_html('admin/general').'">',
 						'^2' => '</A>',
 					));
 	
@@ -224,6 +258,18 @@
 			}
 		}
 	
+	//	Handle new users who must confirm their email now
+	
+		$userid=qa_get_logged_in_userid();
+		if (isset($userid) && (qa_get_logged_in_flags() & QA_USER_FLAGS_MUST_CONFIRM))
+			if ( ($requestlower!='confirm') && ($requestlower!='account') ) {
+				$qa_content=qa_content_prepare();
+				$qa_content['title']=qa_lang_html('users/confirm_title');
+				$qa_content['error']=strtr(qa_lang_html('users/confirm_required'), array(
+					'^1' => '<A HREF="'.qa_path_html('confirm').'">',
+					'^2' => '</A>',
+				));
+			}
 	
 	//	Combine various Javascript elements in $qa_content into single array for theme layer
 	
@@ -267,12 +313,12 @@
 			$script[]='}';
 		}
 		
-		$script[]='--></SCRIPT>';
+		$script[]='//--></SCRIPT>';
 		
 		if (isset($qa_content['script_rel'])) {
 			$uniquerel=array_unique($qa_content['script_rel']); // remove any duplicates
 			foreach ($uniquerel as $script_rel)
-				$script[]='<SCRIPT SRC="'.qa_html($qa_root_url_relative.$script_rel).'" TYPE="text/javascript"></SCRIPT>';
+				$script[]='<SCRIPT SRC="'.qa_html(qa_path_to_root().$script_rel).'" TYPE="text/javascript"></SCRIPT>';
 		}
 		
 		if (isset($qa_content['script_src']))
@@ -280,74 +326,117 @@
 				$script[]='<SCRIPT SRC="'.qa_html($script_src).'" TYPE="text/javascript"></SCRIPT>';
 	
 		$qa_content['script']=$script;
-		
-	
+
 	//	Load the appropriate theme class and output the page
 	
-		$themeclass=qa_load_theme_class(qa_opt('site_theme'), $qa_template, $qa_content, $qa_request);
+		$themeclass=qa_load_theme_class(qa_get_site_theme(), (substr($qa_template, 0, 7)=='custom-') ? 'custom' : $qa_template, $qa_content, qa_request());
 	
 		header('Content-type: '.$qa_content['content_type']);
 		
 		$themeclass->doctype();
 		$themeclass->html();
 		$themeclass->finish();
-	
-				
-	//	End of output phase
-	
-		if (QA_DEBUG_PERFORMANCE)
-			qa_usage_mark('theme');
+	}
 
-	//	Increment question view counter (do at very end so page can be output first)
-	
+
+	function qa_do_content_stats($qa_content)
+/*
+	Update any statistics required by the fields in $qa_content, and return true if something was done
+*/
+	{
 		if (isset($qa_content['inc_views_postid'])) {
 			require_once QA_INCLUDE_DIR.'qa-db-hotness.php';
 			qa_db_hotness_update($qa_content['inc_views_postid'], null, true);
-			
-			if (QA_DEBUG_PERFORMANCE)
-				qa_usage_mark('stats');
+			return true;
 		}
-
-	//	Output the usage to the page
-
-		if (QA_DEBUG_PERFORMANCE)
-			qa_usage_output();
+		
+		return false;
 	}
 
-	
-//	Disconnect from the database
 
-	qa_base_db_disconnect();
+//	Other functions which might be called from anywhere
 
-
-//	Functions used in this file, or made available to any other files that generate Q2A pages
-
-	function qa_page_db_fail_handler($type, $errno=null, $error=null, $query=null)
+	function qa_page_routing()
 /*
-	Standard database failure handler function which bring up the install/repair/upgrade page
+	Return an array of the default Q2A requests and which qa-page-*.php file implements them
+	If the key of an element ends in /, it should be used for any request with that key as its prefix
 */
 	{
-		$pass_failure_type=$type;
-		$pass_failure_errno=$errno;
-		$pass_failure_error=$error;
-		$pass_failure_query=$query;
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
 		
-		require QA_INCLUDE_DIR.'qa-install.php';
-		
-		exit;
+		return array(
+			'account' => 'qa-page-account.php',
+			'activity/' => 'qa-page-activity.php',
+			'admin/' => 'qa-page-admin-default.php',
+			'admin/categories' => 'qa-page-admin-categories.php',
+			'admin/flagged' => 'qa-page-admin-flagged.php',
+			'admin/hidden' => 'qa-page-admin-hidden.php',
+			'admin/layoutwidgets' => 'qa-page-admin-widgets.php',
+			'admin/moderate' => 'qa-page-admin-moderate.php',
+			'admin/pages' => 'qa-page-admin-pages.php',
+			'admin/plugins' => 'qa-page-admin-plugins.php',
+			'admin/points' => 'qa-page-admin-points.php',
+			'admin/recalc' => 'qa-page-admin-recalc.php',
+			'admin/stats' => 'qa-page-admin-stats.php',
+			'admin/userfields' => 'qa-page-admin-userfields.php',
+			'admin/usertitles' => 'qa-page-admin-usertitles.php',
+			'answers/' => 'qa-page-answers.php',
+			'ask' => 'qa-page-ask.php',
+			'categories/' => 'qa-page-categories.php',
+			'comments/' => 'qa-page-comments.php',
+			'confirm' => 'qa-page-confirm.php',
+			'favorites' => 'qa-page-favorites.php',
+			'feedback' => 'qa-page-feedback.php',
+			'forgot' => 'qa-page-forgot.php',
+			'hot/' => 'qa-page-hot.php',
+			'ip/' => 'qa-page-ip.php',
+			'login' => 'qa-page-login.php',
+			'logout' => 'qa-page-logout.php',
+			'message/' => 'qa-page-message.php',
+			'questions/' => 'qa-page-questions.php',
+			'register' => 'qa-page-register.php',
+			'reset' => 'qa-page-reset.php',
+			'search' => 'qa-page-search.php',
+			'tag/' => 'qa-page-tag.php',
+			'tags' => 'qa-page-tags.php',
+			'unanswered/' => 'qa-page-unanswered.php',
+			'unsubscribe' => 'qa-page-unsubscribe.php',
+			'updates' => 'qa-page-updates.php',
+			'user/' => 'qa-page-user.php',
+			'users' => 'qa-page-users.php',
+			'users/blocked' => 'qa-page-users-blocked.php',
+			'users/special' => 'qa-page-users-special.php',
+		);
 	}
-
-
+	
+	
+	function qa_set_template($template)
+/*
+	Sets the template which should be passed to the theme class, telling it which type of page it's displaying
+*/
+	{
+		global $qa_template;
+		$qa_template=$template;
+	}
+	
+	
 	function qa_content_prepare($voting=false, $categoryids=null)
 /*
 	Start preparing theme content in global $qa_content variable, with or without $voting support,
-	in the context of $categoryid (if not null)
+	in the context of the categories in $categoryids (if not null)
 */
 	{
-		global $qa_root_url_relative, $qa_request, $qa_template, $qa_login_userid, $qa_vote_error_html, $qa_nav_pages_cached, $qa_widgets_cached, $QA_CONST_ROUTING;
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		global $qa_template, $qa_vote_error_html;
 		
 		if (QA_DEBUG_PERFORMANCE)
 			qa_usage_mark('control');
+		
+		$request=qa_request();
+		$requestlower=qa_request();
+		$navpages=qa_db_get_pending_result('navpages');
+		$widgets=qa_db_get_pending_result('widgets');
 		
 		if (isset($categoryids) && !is_array($categoryids)) // accept old-style parameter
 			$categoryids=array($categoryids);
@@ -394,7 +483,7 @@
 		if (isset($categoryids))
 			$qa_content['categoryids']=$categoryids;
 		
-		foreach ($qa_nav_pages_cached as $page)
+		foreach ($navpages as $page)
 			if ($page['nav']=='B')
 				qa_navigation_add_page($qa_content['navigation']['main'], $page);
 		
@@ -454,19 +543,24 @@
 				'label' => qa_lang_html('main/nav_users'),
 			);
 			
-		if (qa_user_permit_error('permit_post_q')!='level')
+		if (qa_opt('nav_ask') && (qa_user_permit_error('permit_post_q')!='level'))
 			$qa_content['navigation']['main']['ask']=array(
 				'url' => qa_path_html('ask', (qa_using_categories() && strlen($lastcategoryid)) ? array('cat' => $lastcategoryid) : null),
 				'label' => qa_lang_html('main/nav_ask'),
 			);
 		
 		
-		if (qa_get_logged_in_level()>=QA_USER_LEVEL_ADMIN)
+		if (
+			(qa_get_logged_in_level()>=QA_USER_LEVEL_ADMIN) ||
+			(!qa_user_permit_error('permit_moderate')) ||
+			(!qa_user_permit_error('permit_hide_show')) ||
+			(!qa_user_permit_error('permit_delete_hidden'))
+		)
 			$qa_content['navigation']['main']['admin']=array(
-				'url' => qa_path_html((isset($_COOKIE['qa_admin_last']) && isset($QA_CONST_ROUTING[$_COOKIE['qa_admin_last']]))
-					? $_COOKIE['qa_admin_last'] : 'admin'), // use previously requested admin page if valid
+				'url' => qa_path_html('admin'),
 				'label' => qa_lang_html('main/nav_admin'),
 			);
+
 		
 		$qa_content['search']=array(
 			'form_tags' => 'METHOD="GET" ACTION="'.qa_path_html('search').'"',
@@ -479,7 +573,7 @@
 		if (!qa_opt('feedback_enabled'))
 			unset($qa_content['navigation']['footer']['feedback']);
 			
-		foreach ($qa_nav_pages_cached as $page)
+		foreach ($navpages as $page)
 			if ( ($page['nav']=='M') || ($page['nav']=='O') || ($page['nav']=='F') )
 				qa_navigation_add_page($qa_content['navigation'][($page['nav']=='F') ? 'footer' : 'main'], $page);
 				
@@ -495,8 +589,8 @@
 			'L' => 'low',
 			'B' => 'bottom',
 		);
-
-		foreach ($qa_widgets_cached as $widget)
+		
+		foreach ($widgets as $widget)
 			if (is_numeric(strpos(','.$widget['tags'].',', ','.$qa_template.',')) || is_numeric(strpos(','.$widget['tags'].',', ',all,'))) { // see if it has been selected for display on this template
 				$region=@$regioncodes[substr($widget['place'], 0, 1)];
 				$place=@$placecodes[substr($widget['place'], 1, 2)];
@@ -505,7 +599,8 @@
 					$module=qa_load_module('widget', $widget['title']);
 					
 					if (
-						isset($module) && method_exists($module, 'allow_template') && $module->allow_template($qa_template) &&
+						isset($module) && method_exists($module, 'allow_template') &&
+						$module->allow_template((substr($qa_template, 0, 7)=='custom-') ? 'custom' : $qa_template) &&
 						method_exists($module, 'allow_region') && $module->allow_region($region) && method_exists($module, 'output_widget')
 					)
 						$qa_content['widgets'][$region][$place][]=$module; // if module loaded and happy to be displayed here, tell theme about it
@@ -519,7 +614,7 @@
 		
 		if ($logoshow)
 			$qa_content['logo']='<A HREF="'.qa_path_html('').'" CLASS="qa-logo-link" TITLE="'.qa_html(qa_opt('site_title')).'">'.
-				'<IMG SRC="'.qa_html(is_numeric(strpos($logourl, '://')) ? $logourl : $qa_root_url_relative.$logourl).'"'.
+				'<IMG SRC="'.qa_html(is_numeric(strpos($logourl, '://')) ? $logourl : qa_path_to_root().$logourl).'"'.
 				($logowidth ? (' WIDTH="'.$logowidth.'"') : '').($logoheight ? (' HEIGHT="'.$logoheight.'"') : '').
 				' BORDER="0"/></A>';
 		else
@@ -527,13 +622,13 @@
 
 		$topath=qa_get('to'); // lets user switch between login and register without losing destination page
 
-		$userlinks=qa_get_login_links($qa_root_url_relative, isset($topath) ? $topath : qa_path($qa_request, $_GET, ''));
+		$userlinks=qa_get_login_links(qa_path_to_root(), isset($topath) ? $topath : qa_path($request, $_GET, ''));
 		
 		$qa_content['navigation']['user']=array();
 			
-		if (isset($qa_login_userid)) {
+		if (qa_is_logged_in()) {
 			$qa_content['loggedin']=qa_lang_html_sub_split('main/logged_in_x', QA_FINAL_EXTERNAL_USERS
-				? qa_get_logged_in_user_html(qa_get_logged_in_user_cache(), $qa_root_url_relative, false)
+				? qa_get_logged_in_user_html(qa_get_logged_in_user_cache(), qa_path_to_root(), false)
 				: qa_get_one_user_html(qa_get_logged_in_handle(), false)
 			);
 			
@@ -542,6 +637,11 @@
 					'url' => qa_path_html('account'),
 					'label' => qa_lang_html('main/nav_account'),
 				);
+				
+			$qa_content['navigation']['user']['updates']=array(
+				'url' => qa_path_html('updates'),
+				'label' => qa_lang_html('main/nav_updates'),
+			);
 				
 			if (!empty($userlinks['logout']))
 				$qa_content['navigation']['user']['logout']=array(
@@ -553,31 +653,33 @@
 				$source=qa_get_logged_in_source();
 				
 				if (strlen($source)) {
-					$modulenames=qa_list_modules('login');
+					$loginmodules=qa_load_modules_with('login', 'match_source');
 					
-					foreach ($modulenames as $tryname) {
-						$module=qa_load_module('login', $tryname);
-						
-						if (method_exists($module, 'match_source') && $module->match_source($source) && method_exists($module, 'logout_html')) {
+					foreach ($loginmodules as $module)
+						if ($module->match_source($source) && method_exists($module, 'logout_html')) {
 							ob_start();
 							$module->logout_html(qa_path('logout', array(), qa_opt('site_url')));
 							$qa_content['navigation']['user']['logout']=array('label' => ob_get_clean());
 						}
-					}
 				}
 			}
 			
-		} else {
-			$modulenames=qa_list_modules('login');
+			$notices=qa_db_get_pending_result('notices');
+			foreach ($notices as $notice)
+				$qa_content['notices'][]=qa_notice_form($notice['noticeid'], qa_viewer_html($notice['content'], $notice['format']), $notice);
 			
-			foreach ($modulenames as $tryname) {
-				$module=qa_load_module('login', $tryname);
-				
-				if (method_exists($module, 'login_html')) {
-					ob_start();
-					$module->login_html(isset($topath) ? (qa_opt('site_url').$topath) : qa_path($qa_request, $_GET, qa_opt('site_url')), 'menu');
-					$qa_content['navigation']['user'][$tryname]=array('label' => ob_get_clean());
-				}
+		} else {
+			require_once QA_INCLUDE_DIR.'qa-util-string.php';
+			
+			$loginmodules=qa_load_modules_with('login', 'login_html');
+			
+			foreach ($loginmodules as $tryname => $module) {
+				ob_start();
+				$module->login_html(isset($topath) ? (qa_opt('site_url').$topath) : qa_path($request, $_GET, qa_opt('site_url')), 'menu');
+				$label=ob_get_clean();
+
+				if (strlen($label))
+					$qa_content['navigation']['user'][implode('-', qa_string_to_words($tryname))]=array('label' => $label);
 			}
 			
 			if (!empty($userlinks['login']))
@@ -592,32 +694,87 @@
 					'label' => qa_lang_html('main/nav_register'),
 				);
 		}
-		
-		$qa_content['script_rel']=array('qa-content/jquery-1.6.1.min.js');
-		
-		if ($voting) {
-			$qa_content['error']=@$qa_vote_error_html;
-			$qa_content['script_rel'][]='qa-content/qa-votes.js?'.QA_VERSION;
+
+		if (QA_FINAL_EXTERNAL_USERS || !qa_is_logged_in()) {
+			if (qa_opt('show_notice_visitor') && (!isset($topath)) && (!isset($_COOKIE['qa_noticed'])))
+				$qa_content['notices'][]=qa_notice_form('visitor', qa_opt('notice_visitor'));
+
+		} else {
+			setcookie('qa_noticed', 1, time()+86400*3650, '/', QA_COOKIE_DOMAIN); // don't show first-time notice if a user has logged in
+
+			if (qa_opt('show_notice_welcome') && (qa_get_logged_in_flags() & QA_USER_FLAGS_WELCOME_NOTICE) )
+				if ( ($requestlower!='confirm') && ($requestlower!='account') ) // let people finish registering in peace
+					$qa_content['notices'][]=qa_notice_form('welcome', qa_opt('notice_welcome'));
 		}
+		
+		$qa_content['script_rel']=array('qa-content/jquery-1.7.1.min.js');
+		$qa_content['script_rel'][]='qa-content/qa-page.js?'.QA_VERSION;
+		
+		if ($voting)
+			$qa_content['error']=@$qa_vote_error_html;
 			
 		$qa_content['script_var']=array(
-			'qa_root' => $qa_root_url_relative,
-			'qa_request' => $qa_request,
+			'qa_root' => qa_path_to_root(),
+			'qa_request' => $request,
 		);
 		
 		return $qa_content;
 	}
 
 
-	function qa_self_html()
+	function qa_get_start()
 /*
-	Return an HTML-ready relative URL for the current page, preserving GET parameters - this is useful for ACTION in FORMs
+	Get the start parameter which should be used, as constrained by the setting in qa-config.php
 */
 	{
-		global $qa_used_url_format, $qa_request;
-		
-		return qa_path_html($qa_request, $_GET, null, $qa_used_url_format);
+		return min(max(0, (int)qa_get('start')), QA_MAX_LIMIT_START);
 	}
+	
+	
+	function qa_get_state()
+/*
+	Get the state parameter which should be used, as set earlier in qa_load_state()
+*/
+	{
+		global $qa_state;
+		return $qa_state;
+	}
+	
+
+//	Below are the steps that actually execute for this file - all the above are function definitions
+
+	qa_report_process_stage('init_page');
+	qa_db_connect('qa_page_db_fail_handler');
+		
+	qa_page_queue_pending();
+	qa_load_state();
+	qa_check_login_modules();
+	
+	if (QA_DEBUG_PERFORMANCE)
+		qa_usage_mark('setup');
+
+	qa_check_page_clicks();
+
+	$qa_content=qa_get_request_content();
+	
+	if (is_array($qa_content)) {
+		if (QA_DEBUG_PERFORMANCE)
+			qa_usage_mark('view');
+
+		qa_output_content($qa_content);
+
+		if (QA_DEBUG_PERFORMANCE)
+			qa_usage_mark('theme');
+			
+		if (qa_do_content_stats($qa_content))
+			if (QA_DEBUG_PERFORMANCE)
+				qa_usage_mark('stats');
+
+		if (QA_DEBUG_PERFORMANCE)
+			qa_usage_output();
+	}
+
+	qa_db_disconnect();
 
 
 /*

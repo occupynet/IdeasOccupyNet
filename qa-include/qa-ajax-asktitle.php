@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-ajax-asktitle.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Server-side response to Ajax request based on ask a question title
 
 
@@ -29,20 +28,9 @@
 	require_once QA_INCLUDE_DIR.'qa-util-string.php';
 	
 
-	function qa_ajax_asktitle_db_fail_handler()
-	{
-		echo "QA_AJAX_RESPONSE\n0\nA database error occurred.";
-		exit;
-	}
-
-
-	$intitle=qa_post_text('title');
-	
-
 //	Collect the information we need from the database
 
-	qa_base_db_connect('qa_ajax_asktitle_db_fail_handler');
-	
+	$intitle=qa_post_text('title');
 	$doaskcheck=qa_opt('do_ask_check_qs');
 	$doexampletags=qa_using_tags() && qa_opt('do_example_tags');
 
@@ -111,7 +99,7 @@
 				echo qa_lang_html('question/ask_same_q').'<BR/>';
 			
 			echo strtr(
-				'<A HREF="'.qa_path_html(qa_q_request($question['postid'], $question['title'])).'" TARGET="_blank">'.$question['title'].'</A><BR/>',
+				'<A HREF="'.qa_q_path_html($question['postid'], $question['title']).'" TARGET="_blank">'.qa_html($question['title']).'</A><BR/>',
 				"\r\n", '  '
 			)."\n";
 			
@@ -119,8 +107,6 @@
 				break;
 		}
 	}
-	
-	qa_base_db_disconnect();
 	
 
 /*

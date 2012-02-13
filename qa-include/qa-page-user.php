@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-user.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for user profile page
 
 
@@ -32,60 +31,66 @@
 
 	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
+	require_once QA_INCLUDE_DIR.'qa-app-updates.php';
 	require_once QA_INCLUDE_DIR.'qa-app-users.php';
 	
-
-	if (!strlen(@$pass_subrequests[0]))
+	$handle=qa_request_part(1);
+	if (!strlen($handle))
 		qa_redirect('users');
 
 
+//	Get the HTML to display for the handle, and if we're using external users, determine the userid 
+
 	if (QA_FINAL_EXTERNAL_USERS) {
-		$publictouserid=qa_get_userids_from_public(array(@$pass_subrequests[0]));
-		$userid=@$publictouserid[@$pass_subrequests[0]];
+		$publictouserid=qa_get_userids_from_public(array($handle));
 		
-		if (!isset($userid))
+		if (!count($publictouserid))
 			return include QA_INCLUDE_DIR.'qa-page-not-found.php';
 		
-		$usershtml=qa_get_users_html(array($userid), false, $qa_root_url_relative, true);
+		$userid=reset($publictouserid); // don't use $publictouserid[$handle] since $handle capitalization might be different
+		$usershtml=qa_get_users_html(array($userid), false, qa_path_to_root(), true);
 		$userhtml=@$usershtml[$userid];
 
-	} else {
-		$handle=@$pass_subrequests[0]; // picked up from qa-page.php
+	} else
 		$userhtml=qa_html($handle);
-	}
 
 	
 //	Find the user profile and questions and answers for this handle
 	
+	$loginuserid=qa_get_logged_in_userid();
 	$identifier=QA_FINAL_EXTERNAL_USERS ? $userid : $handle;
 
-	@list($useraccount, $userprofile, $userfields, $userpoints, $userrank, $questions, $answerquestions, $commentquestions)=qa_db_select_with_pending(
-		QA_FINAL_EXTERNAL_USERS ? null : qa_db_user_account_selectspec($handle, false),
-		QA_FINAL_EXTERNAL_USERS ? null : qa_db_user_profile_selectspec($handle, false),
-		QA_FINAL_EXTERNAL_USERS ? null : qa_db_userfields_selectspec(),
-		qa_db_user_points_selectspec($identifier),
-		qa_db_user_rank_selectspec($identifier),
-		qa_db_user_recent_qs_selectspec($qa_login_userid, $identifier),
-		qa_db_user_recent_a_qs_selectspec($qa_login_userid, $identifier),
-		qa_db_user_recent_c_qs_selectspec($qa_login_userid, $identifier)
-	);
+	@list($useraccount, $userprofile, $userfields, $userpoints, $userrank, $questions, $answerqs, $commentqs, $editqs, $favorite)=
+		qa_db_select_with_pending(
+			QA_FINAL_EXTERNAL_USERS ? null : qa_db_user_account_selectspec($handle, false),
+			QA_FINAL_EXTERNAL_USERS ? null : qa_db_user_profile_selectspec($handle, false),
+			QA_FINAL_EXTERNAL_USERS ? null : qa_db_userfields_selectspec(),
+			qa_db_user_points_selectspec($identifier),
+			qa_db_user_rank_selectspec($identifier),
+			qa_db_user_recent_qs_selectspec($loginuserid, $identifier, qa_opt_if_loaded('page_size_user_posts')),
+			qa_db_user_recent_a_qs_selectspec($loginuserid, $identifier),
+			qa_db_user_recent_c_qs_selectspec($loginuserid, $identifier),
+			qa_db_user_recent_edit_qs_selectspec($loginuserid, $identifier),
+			(isset($loginuserid) && !QA_FINAL_EXTERNAL_USERS) ? qa_db_is_favorite_selectspec($loginuserid, QA_ENTITY_USER, $handle) : null
+		);
 	
 
 //	Check the user exists and work out what can and can't be set (if not using single sign-on)
 	
+	$loginlevel=qa_get_logged_in_level();
+
 	if (!QA_FINAL_EXTERNAL_USERS) { // if we're using integrated user management, we can know and show more
 		if ((!is_array($userpoints)) && !is_array($useraccount))
 			return include QA_INCLUDE_DIR.'qa-page-not-found.php';
 	
 		$userid=$useraccount['userid'];
-		$loginlevel=qa_get_logged_in_level();
 
 		$fieldseditable=false;
 		$maxlevelassign=null;
 		
 		if (
-			$qa_login_userid &&
-			($qa_login_userid!=$userid) &&
+			$loginuserid &&
+			($loginuserid!=$userid) &&
 			(($loginlevel>=QA_USER_LEVEL_SUPER) || ($loginlevel>$useraccount['level'])) &&
 			(!qa_user_permit_error())
 		) { // can't change self - or someone on your level (or higher, obviously) unless you're a super admin
@@ -107,7 +112,7 @@
 		}
 		
 		$usereditbutton=$fieldseditable || isset($maxlevelassign);
-		$userediting=$usereditbutton && ($qa_state=='edit');
+		$userediting=$usereditbutton && (qa_get_state()=='edit');
 	}
 
 
@@ -118,10 +123,10 @@
 		
 		if ($usereditbutton) {
 			if (qa_clicked('docancel'))
-				qa_redirect($qa_request);
+				qa_redirect(qa_request());
 			
 			elseif (qa_clicked('doedit'))
-				qa_redirect($qa_request, array('state' => 'edit'));
+				qa_redirect(qa_request(), array('state' => 'edit'));
 				
 			elseif (qa_clicked('dosave')) {
 				require_once QA_INCLUDE_DIR.'qa-app-users-edit.php';
@@ -129,33 +134,49 @@
 				
 				$errors=array();
 				
+				if (qa_post_text('removeavatar')) {
+					qa_db_user_set_flag($userid, QA_USER_FLAGS_SHOW_AVATAR, false);
+					qa_db_user_set_flag($userid, QA_USER_FLAGS_SHOW_GRAVATAR, false);
+
+					if (isset($useraccount['avatarblobid'])) {
+						require_once QA_INCLUDE_DIR.'qa-db-blobs.php';
+						
+						qa_db_user_set($userid, 'avatarblobid', null);
+						qa_db_user_set($userid, 'avatarwidth', null);
+						qa_db_user_set($userid, 'avatarheight', null);
+						qa_db_blob_delete($useraccount['avatarblobid']);
+					}
+				}
+				
 				if ($fieldseditable) {
 					$inemail=qa_post_text('email');
 					
-					$errors=qa_handle_email_validate($handle, $inemail, $userid);
+					$filterhandle=$handle; // we're not filtering the handle...
+					$errors=qa_handle_email_filter($filterhandle, $inemail, $useraccount);
+					unset($errors['handle']); // ...and we don't care about any errors in it
 					
 					if (!isset($errors['email']))
 						if ($inemail != $useraccount['email']) {
 							qa_db_user_set($userid, 'email', $inemail);
 							qa_db_user_set_flag($userid, QA_USER_FLAGS_EMAIL_CONFIRMED, false);
 						}
-		
-					$infield=array();
-					foreach ($userfields as $userfield) {
-						$fieldname='field_'.$userfield['fieldid'];
-						$fieldvalue=qa_post_text($fieldname);
-
-						$infield[$fieldname]=$fieldvalue;
-						qa_profile_field_validate($fieldname, $fieldvalue, $errors);
-
-						if (!isset($errors[$fieldname]))
-							qa_db_user_profile_set($userid, $userfield['title'], $fieldvalue);
-					}
+						
+					$inprofile=array();
+					foreach ($userfields as $userfield)
+						$inprofile[$userfield['fieldid']]=qa_post_text('field_'.$userfield['fieldid']);
+						
+					$filtermodules=qa_load_modules_with('filter', 'filter_profile');
+					foreach ($filtermodules as $filtermodule)
+						$filtermodule->filter_profile($inprofile, $errors, $useraccount, $userprofile);
+				
+					foreach ($userfields as $userfield)
+						if (!isset($errors[$userfield['fieldid']]))
+							qa_db_user_profile_set($userid, $userfield['title'], $inprofile[$userfield['fieldid']]);
 					
 					if (count($errors))
 						$userediting=true;
 						
-					qa_report_event('u_edit', $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, array(
+					qa_report_event('u_edit', $loginuserid, qa_get_logged_in_handle(), qa_cookie_get(), array(
 						'userid' => $userid,
 						'handle' => $useraccount['handle'],
 					));
@@ -167,7 +188,7 @@
 					if ($inlevel != $useraccount['level']) {
 						qa_db_user_set($userid, 'level', $inlevel);
 
-						qa_report_event('u_level', $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, array(
+						qa_report_event('u_level', $loginuserid, qa_get_logged_in_handle(), qa_cookie_get(), array(
 							'userid' => $userid,
 							'handle' => $useraccount['handle'],
 							'level' => $inlevel,
@@ -178,7 +199,7 @@
 						
 				
 				if (empty($errors))
-					qa_redirect($qa_request);
+					qa_redirect(qa_request());
 				
 				list($useraccount, $userprofile)=qa_db_select_with_pending(
 					qa_db_user_account_selectspec($userid, true),
@@ -193,12 +214,12 @@
 				
 				qa_db_user_set_flag($userid, QA_USER_FLAGS_USER_BLOCKED, true);
 
-				qa_report_event('u_block', $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, array(
+				qa_report_event('u_block', $loginuserid, qa_get_logged_in_handle(), qa_cookie_get(), array(
 					'userid' => $userid,
 					'handle' => $useraccount['handle'],
 				));
 
-				qa_redirect($qa_request);
+				qa_redirect(qa_request());
 			}
 
 			if (qa_clicked('dounblock')) {
@@ -206,12 +227,12 @@
 				
 				qa_db_user_set_flag($userid, QA_USER_FLAGS_USER_BLOCKED, false);
 
-				qa_report_event('u_unblock', $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, array(
+				qa_report_event('u_unblock', $loginuserid, qa_get_logged_in_handle(), qa_cookie_get(), array(
 					'userid' => $userid,
 					'handle' => $useraccount['handle'],
 				));
 
-				qa_redirect($qa_request);
+				qa_redirect(qa_request());
 			}
 
 			if (qa_clicked('dohideall') && !qa_user_permit_error('permit_hide_show')) {
@@ -221,18 +242,42 @@
 				$postids=qa_db_get_user_visible_postids($userid);
 				
 				foreach ($postids as $postid)
-					qa_post_set_hidden($postid, true, $qa_login_userid);
+					qa_post_set_hidden($postid, true, $loginuserid);
 					
-				qa_redirect($qa_request);
+				qa_redirect(qa_request());
+			}
+			
+			if (qa_clicked('dodelete') && ($loginlevel>=QA_USER_LEVEL_ADMIN)) {
+				require_once QA_INCLUDE_DIR.'qa-app-users-edit.php';
+				
+				qa_delete_user($userid);
+				
+				qa_report_event('u_delete', $loginuserid, qa_get_logged_in_handle(), qa_cookie_get(), array(
+					'userid' => $userid,
+					'handle' => $useraccount['handle'],
+				));
+				
+				qa_redirect('users');
 			}
 		}
 	}
 
 
+//	Process bonus setting button
+
+	if ( ($loginlevel>=QA_USER_LEVEL_ADMIN) && qa_clicked('dosetbonus') ) {
+		require_once QA_INCLUDE_DIR.'qa-db-points.php';
+		
+		qa_db_points_set_bonus($userid, (int)qa_post_text('bonus'));
+		qa_db_points_update_ifuser($userid, null);
+		qa_redirect(qa_request(), null, null, null, 'activity');
+	}
+	
+
 //	Get information on user references in answers and other stuff need for page
 
 	$pagesize=qa_opt('page_size_user_posts');
-	$questions=qa_any_sort_by_date(array_merge($questions, $answerquestions, $commentquestions));
+	$questions=qa_any_sort_and_dedupe(array_merge($questions, $answerqs, $commentqs, $editqs));
 	$questions=array_slice($questions, 0, $pagesize);
 	$usershtml=qa_userids_handles_html(qa_any_get_userids_handles($questions));
 	$usershtml[$userid]=$userhtml;
@@ -243,6 +288,10 @@
 	$qa_content=qa_content_prepare(true);
 	
 	$qa_content['title']=qa_lang_html_sub('profile/user_x', $userhtml);
+
+	if (isset($loginuserid) && !QA_FINAL_EXTERNAL_USERS)
+		$qa_content['favorite']=qa_favorite_form(QA_ENTITY_USER, $useraccount['userid'], $favorite,
+			qa_lang_sub($favorite ? 'main/remove_x_favorites' : 'users/add_user_x_favorites', $handle));
 
 
 //	General information about the user, only available if we're using internal user management
@@ -261,6 +310,8 @@
 					'html' => qa_get_user_avatar_html($useraccount['flags'], $useraccount['email'], $useraccount['handle'],
 						$useraccount['avatarblobid'], $useraccount['avatarwidth'], $useraccount['avatarheight'], qa_opt('avatar_profile_size')),
 				),
+				
+				'removeavatar' => null,
 				
 				'duration' => array(
 					'type' => 'static',
@@ -284,7 +335,7 @@
 	
 	//	Private message form
 	
-		if ( qa_opt('allow_private_messages') && isset($qa_login_userid) && ($qa_login_userid!=$userid) && !($useraccount['flags'] & QA_USER_FLAGS_NO_MESSAGES) )
+		if ( qa_opt('allow_private_messages') && isset($loginuserid) && ($loginuserid!=$userid) && !($useraccount['flags'] & QA_USER_FLAGS_NO_MESSAGES) )
 			$qa_content['form_profile']['fields']['level']['value'].=strtr(qa_lang_html('profile/send_private_message'), array(
 				'^1' => '<A HREF="'.qa_path_html('message/'.$handle).'">',
 				'^2' => '</A>',
@@ -298,8 +349,12 @@
 		
 		foreach ($permitoptions as $permitoption)
 			if (qa_opt($permitoption)<QA_PERMIT_CONFIRMED) // if it's not available to all users (after they've confirmed their email address)
-				if (!qa_permit_error($permitoption, $userid, $useraccount['level'], $useraccount['flags'], $userpoints['points'])) // but this user can
-					$showpermits[]=qa_lang('profile/'.$permitoption); // then show it as an extra priviliege
+				if (!qa_permit_error($permitoption, $userid, $useraccount['level'], $useraccount['flags'], $userpoints['points'])) { // but this user can
+					if ($permitoption=='permit_retag_cat')
+						$showpermits[]=qa_lang(qa_using_categories() ? 'profile/permit_recat' : 'profile/permit_retag');
+					else
+						$showpermits[]=qa_lang('profile/'.$permitoption); // then show it as an extra priviliege
+				}
 				
 		if (count($showpermits))
 			$qa_content['form_profile']['fields']['permits']=array(
@@ -365,14 +420,14 @@
 		$fieldsediting=$fieldseditable && $userediting;
 		
 		foreach ($userfields as $userfield) {	
-			$fieldname='field_'.$userfield['fieldid'];
-
 			if (($userfield['flags'] & QA_FIELD_FLAGS_LINK_URL) && !$fieldsediting)
 				$valuehtml=qa_url_to_html_link(@$userprofile[$userfield['title']], qa_opt('links_in_new_window'));
+
 			else {
-				$value=@$infield[$fieldname];
+				$value=@$inprofile[$userfield['fieldid']];
 				if (!isset($value))
 					$value=@$userprofile[$userfield['title']];
+
 				$valuehtml=qa_html($value, (($userfield['flags'] & QA_FIELD_FLAGS_MULTI_LINE) && !$fieldsediting) ? true : false);
 			}
 					
@@ -383,9 +438,9 @@
 			$qa_content['form_profile']['fields'][$userfield['title']]=array(
 				'type' => $fieldsediting ? 'text' : 'static',
 				'label' => qa_html($label),
-				'tags' => 'NAME="'.$fieldname.'"',
+				'tags' => 'NAME="field_'.$userfield['fieldid'].'"',
 				'value' => $valuehtml,
-				'error' => qa_html(@$errors[$fieldname]),
+				'error' => qa_html(@$errors[$userfield['fieldid']]),
 				'rows' => ($userfield['flags'] & QA_FIELD_FLAGS_MULTI_LINE) ? 8 : null,
 			);
 		}
@@ -397,6 +452,17 @@
 
 			if ($userediting) {
 
+				if (
+					(qa_opt('avatar_allow_gravatar') && ($useraccount['flags'] & QA_USER_FLAGS_SHOW_GRAVATAR)) ||
+					(qa_opt('avatar_allow_upload') && (($useraccount['flags'] & QA_USER_FLAGS_SHOW_AVATAR)) && isset($useraccount['avatarblobid']))
+				) {
+					$qa_content['form_profile']['fields']['removeavatar']=array(
+						'type' => 'checkbox',
+						'label' => qa_lang_html('users/remove_avatar'),
+						'tags' => 'NAME="removeavatar"',
+					);
+				}
+				
 				if (isset($maxlevelassign)) {
 					$qa_content['form_profile']['fields']['level']['type']='select';
 		
@@ -426,7 +492,7 @@
 				$qa_content['form_profile']['buttons']=array(
 					'edit' => array(
 						'tags' => 'NAME="doedit"',
-						'label' => qa_lang_html($fieldseditable ? 'users/edit_user_button' : 'users/edit_level_button'),
+						'label' => qa_lang_html('users/edit_user_button'),
 					),
 				);
 				
@@ -442,6 +508,12 @@
 								'tags' => 'NAME="dohideall"',
 								'label' => qa_lang_html('users/hide_all_user_button'),
 							);
+							
+						if ($loginlevel>=QA_USER_LEVEL_ADMIN)
+							$qa_content['form_profile']['buttons']['delete']=array(
+								'tags' => 'NAME="dodelete"',
+								'label' => qa_lang_html('users/delete_user_button'),
+							);
 						
 					} else
 						$qa_content['form_profile']['buttons']['block']=array(
@@ -451,17 +523,31 @@
 				}
 			}
 		}
+		
+		if (!is_array($qa_content['form_profile']['fields']['removeavatar']))
+			unset($qa_content['form_profile']['fields']['removeavatar']);
+			
+		$qa_content['raw']['account']=$useraccount; // for plugin layers to access
+		$qa_content['raw']['profile']=$userprofile;
 	}
 	
 
 //	Information about user activity, available also with single sign-on integration
 
 	$qa_content['form_activity']=array(
-		'title' => qa_lang_html_sub('profile/activity_by_x', $userhtml),
+		'title' => '<A NAME="activity">'.qa_lang_html_sub('profile/activity_by_x', $userhtml).'</A>',
 		
 		'style' => 'wide',
 		
 		'fields' => array(
+			'bonus' => array(
+				'label' => qa_lang_html('profile/bonus_points'),
+				'tags' => 'NAME="bonus"',
+				'value' => qa_html($userpoints['bonus']),
+				'type' => 'number',
+				'note' => qa_lang_html('users/only_shown_admins'),
+			),
+	
 			'points' => array(
 				'type' => 'static',
 				'label' => qa_lang_html('profile/score'),
@@ -469,7 +555,7 @@
 					? qa_lang_html_sub('main/1_point', '<SPAN CLASS="qa-uf-user-points">1</SPAN>', '1')
 					: qa_lang_html_sub('main/x_points', '<SPAN CLASS="qa-uf-user-points">'.qa_html(number_format(@$userpoints['points'])).'</SPAN>')
 			),
-	
+			
 			'title' => array(
 				'type' => 'static',
 				'label' => qa_lang_html('profile/title'),
@@ -489,6 +575,19 @@
 			),
 		),
 	);
+	
+	if ($loginlevel>=QA_USER_LEVEL_ADMIN) {
+		$qa_content['form_activity']['tags']='METHOD="POST" ACTION="'.qa_self_html().'"';
+		
+		$qa_content['form_activity']['buttons']=array(
+			'setbonus' => array(
+				'tags' => 'NAME="dosetbonus"',
+				'label' => qa_lang_html('profile/set_bonus_button'),
+			),
+		);
+		
+	} else
+		unset($qa_content['form_activity']['fields']['bonus']);
 	
 	if (!isset($qa_content['form_activity']['fields']['title']['value']))
 		unset($qa_content['form_activity']['fields']['title']);
@@ -573,6 +672,13 @@
 			: qa_lang_html_sub('profile/x_chosen_as_best', '<SPAN CLASS="qa-uf-user-a-selecteds">'.number_format($userpoints['aselecteds']).'</SPAN>');
 
 
+//	For plugin layers to access
+
+	$qa_content['raw']['userid']=$userid;
+	$qa_content['raw']['points']=$userpoints;
+	$qa_content['raw']['rank']=$userrank;
+
+
 //	Recent posts by this user
 
 	if ($pagesize>0) {
@@ -592,7 +698,7 @@
 		$htmloptions['avatarsize']=0;
 		
 		foreach ($questions as $question)
-			$qa_content['q_list']['qs'][]=qa_any_to_q_html_fields($question, $qa_login_userid, $qa_cookieid, $usershtml,
+			$qa_content['q_list']['qs'][]=qa_any_to_q_html_fields($question, $loginuserid, qa_cookie_get(), $usershtml,
 				null, $htmloptions);
 	}
 

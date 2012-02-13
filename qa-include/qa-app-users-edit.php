@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-users-edit.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: User management (application level) for creating/modifying users
 
 
@@ -30,50 +29,50 @@
 		exit;
 	}
 
+	@define('QA_MIN_PASSWORD_LEN', 4);
+	@define('QA_NEW_PASSWORD_LEN', 8); // when resetting password
 
-	define('QA_MIN_PASSWORD_LEN', 4);
-	define('QA_NEW_PASSWORD_LEN', 8);
 
-
-	function qa_handle_email_validate($handle, $email, $allowuserid=null)
+	function qa_handle_email_filter(&$handle, &$email, $olduser=null)
 /*
-	Return $errors fields for any invalid aspect of user-entered $handle (username) and $email.
-	Also rejects existing values in database unless they belongs to $allowuserid (if set).
+	Return $errors fields for any invalid aspect of user-entered $handle (username) and $email. Works by calling through
+	to all filter modules and also rejects existing values in database unless they belongs to $olduser (if set).
 */
 	{
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
-		require_once QA_INCLUDE_DIR.'qa-db-maxima.php';
-		require_once QA_INCLUDE_DIR.'qa-util-string.php';
 		
 		$errors=array();
 		
-		if (empty($handle))
-			$errors['handle']=qa_lang('users/handle_empty');
+		$filtermodules=qa_load_modules_with('filter', 'filter_handle');
+		
+		foreach ($filtermodules as $filtermodule) {
+			$error=$filtermodule->filter_handle($handle, $olduser);
+			if (isset($error)) {
+				$errors['handle']=$error;
+				break;
+			}
+		}
 
-		elseif (preg_match('/[\\@\\+\\/]/', $handle))
-			$errors['handle']=qa_lang_sub('users/handle_has_bad', '@ + /');
-		
-		elseif (qa_strlen($handle)>QA_DB_MAX_HANDLE_LENGTH)
-			$errors['handle']=qa_lang_sub('main/max_length_x', QA_DB_MAX_HANDLE_LENGTH);
-		
-		else {
+		if (!isset($errors['handle'])) { // first test through filters, then check for duplicates here
 			$handleusers=qa_db_user_find_by_handle($handle);
-			if (count($handleusers) && ( (!isset($allowuserid)) || (array_search($allowuserid, $handleusers)===false) ) )
+			if (count($handleusers) && ( (!isset($olduser['userid'])) || (array_search($olduser['userid'], $handleusers)===false) ) )
 				$errors['handle']=qa_lang('users/handle_exists');
 		}
 		
-		if (empty($email))
-			$errors['email']=qa_lang('users/email_required');
+		$filtermodules=qa_load_modules_with('filter', 'filter_email');
 		
-		elseif (!qa_email_validate($email))
-			$errors['email']=qa_lang('users/email_invalid');
-		
-		elseif (qa_strlen($email)>QA_DB_MAX_EMAIL_LENGTH)
-			$errors['email']=qa_lang_sub('main/max_length_x', QA_DB_MAX_EMAIL_LENGTH);
-			
-		else {
+		$error=null;
+		foreach ($filtermodules as $filtermodule) {
+			$error=$filtermodule->filter_email($email, $olduser);
+			if (isset($error)) {
+				$errors['email']=$error;
+				break;
+			}
+		}
+
+		if (!isset($errors['email'])) {
 			$emailusers=qa_db_user_find_by_email($email);
-			if (count($emailusers) && ( (!isset($allowuserid)) || (array_search($allowuserid, $emailusers)===false) ) )
+			if (count($emailusers) && ( (!isset($olduser['userid'])) || (array_search($olduser['userid'], $emailusers)===false) ) )
 				$errors['email']=qa_lang('users/email_exists');
 		}
 		
@@ -81,7 +80,7 @@
 	}
 	
 	
-	function qa_handle_make_valid($handle, $allowuserid=null)
+	function qa_handle_make_valid($handle)
 /*
 	Make $handle valid and unique in the database - if $allowuserid is set, allow it to match that user only
 */
@@ -97,44 +96,55 @@
 		for ($attempt=0; $attempt<=99; $attempt++) {
 			$suffix=$attempt ? (' '.$attempt) : '';
 			$tryhandle=qa_substr($handle, 0, QA_DB_MAX_HANDLE_LENGTH-strlen($suffix)).$suffix;
-			$handleusers=qa_db_user_find_by_handle($tryhandle);
-		
-			if (!(count($handleusers) && ( (!isset($allowuserid)) || (array_search($allowuserid, $handleusers)===false) ) ))
-				return $tryhandle;
+
+			$filtermodules=qa_load_modules_with('filter', 'filter_handle');
+			foreach ($filtermodules as $filtermodule)
+				$filtermodule->filter_handle($handle, null); // filter first without worrying about errors, since our goal is to get a valid one
+			
+			$haderror=false;
+			
+			foreach ($filtermodules as $filtermodule) {
+				$error=$filtermodule->filter_handle($handle, null); // now check for errors after we've filtered
+				if (isset($error))
+					$haderror=true;
+			}
+			
+			if (!$haderror) {
+				$handleusers=qa_db_user_find_by_handle($tryhandle);
+				if (!count($handleusers))
+					return $tryhandle;
+			}
 		}
 		
-		qa_fatal_error('Could not create a unique handle');
+		qa_fatal_error('Could not create a valid and unique handle from: '.$handle);
 	}
 
 
-	function qa_profile_field_validate($field, $value, &$errors)
+	function qa_password_validate($password, $olduser=null)
 /*
-	Return $errors fields for any invalid aspect of user-entered profile information
+	Return an array with a single element (key 'password') if user-entered $password is valid, otherwise an empty array.
+	Works by calling through to all filter modules.
 */
 	{
-		require_once QA_INCLUDE_DIR.'qa-db-maxima.php';
-		require_once QA_INCLUDE_DIR.'qa-util-string.php';
+		$error=null;
+		$filtermodules=qa_load_modules_with('filter', 'validate_password');
 		
-		if (qa_strlen($value)>QA_DB_MAX_PROFILE_CONTENT_LENGTH)
-			$errors[$field]=qa_lang_sub('main/max_length_x', QA_DB_MAX_PROFILE_CONTENT_LENGTH);
-	}
-
-
-	function qa_password_validate($password)
-/*
-	Return $errors fields for any invalid aspect of user-entered password
-*/
-	{
-		require_once QA_INCLUDE_DIR.'qa-util-string.php';
-
-		$errors=array();
-
-		$minpasslen=max(QA_MIN_PASSWORD_LEN, 1);
+		foreach ($filtermodules as $filtermodule) {
+			$error=$filtermodule->validate_password($password, $olduser);
+			if (isset($error))
+				break;
+		}
 		
-		if (qa_strlen($password)<$minpasslen)
-			$errors['password']=qa_lang_sub('users/password_min', $minpasslen);
-		
-		return $errors;
+		if (!isset($error)) {
+			$minpasslen=max(QA_MIN_PASSWORD_LEN, 1);
+			if (qa_strlen($password)<$minpasslen)
+				$error=qa_lang_sub('users/password_min', $minpasslen);
+		}		
+
+		if (isset($error))
+			return array('password' => $error);
+
+		return array();
 	}
 
 	
@@ -145,33 +155,40 @@
 	Handles user points, notification and optional email confirmation.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
 		require_once QA_INCLUDE_DIR.'qa-db-points.php';
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-app-emails.php';
 		require_once QA_INCLUDE_DIR.'qa-app-cookies.php';
 
-		$userid=qa_db_user_create($email, $password, $handle, $level, @$_SERVER['REMOTE_ADDR']);
+		$userid=qa_db_user_create($email, $password, $handle, $level, qa_remote_ip_address());
 		qa_db_points_update_ifuser($userid, null);
 		
 		if ($confirmed)
 			qa_db_user_set_flag($userid, QA_USER_FLAGS_EMAIL_CONFIRMED, true);
+			
+		if (qa_opt('show_notice_welcome'))
+			qa_db_user_set_flag($userid, QA_USER_FLAGS_WELCOME_NOTICE, true);
 		
-		$options=qa_get_options(array('custom_welcome', 'site_url', 'confirm_user_emails'));
+		$custom=qa_opt('show_custom_welcome') ? trim(qa_opt('custom_welcome')) : '';
 		
-		$custom=trim($options['custom_welcome']);
-		
-		if ($options['confirm_user_emails'] && ($level<QA_USER_LEVEL_EXPERT) && !$confirmed)
+		if (qa_opt('confirm_user_emails') && ($level<QA_USER_LEVEL_EXPERT) && !$confirmed) {
 			$confirm=strtr(qa_lang('emails/welcome_confirm'), array(
 				'^url' => qa_get_new_confirm_url($userid, $handle)
 			));
-		else
+			
+			if (qa_opt('confirm_user_required'))
+				qa_db_user_set_flag($userid, QA_USER_FLAGS_MUST_CONFIRM, true);
+				
+		} else
 			$confirm='';
 		
 		qa_send_notification($userid, $email, $handle, qa_lang('emails/welcome_subject'), qa_lang('emails/welcome_body'), array(
 			'^password' => isset($password) ? $password : qa_lang('users/password_to_set'),
-			'^url' => $options['site_url'],
-			'^custom' => empty($custom) ? '' : ($custom."\n\n"),
+			'^url' => qa_opt('site_url'),
+			'^custom' => strlen($custom) ? ($custom."\n\n") : '',
 			'^confirm' => $confirm,
 		));
 		
@@ -182,6 +199,35 @@
 		
 		return $userid;
 	}
+	
+	
+	function qa_delete_user($userid)
+/*
+	Delete $userid and all their votes and flags. Their posts will become anonymous.
+	Handles recalculations of votes and flags for posts this user has affected.
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		require_once QA_INCLUDE_DIR.'qa-db-votes.php';
+		require_once QA_INCLUDE_DIR.'qa-db-users.php';
+		require_once QA_INCLUDE_DIR.'qa-db-post-update.php';
+		require_once QA_INCLUDE_DIR.'qa-db-points.php';
+		
+		$postids=qa_db_uservoteflag_user_get($userid); // posts this user has flagged or voted on, whose counts need updating
+		
+		qa_db_user_delete($userid);
+		
+		foreach ($postids as $postid) { // hoping there aren't many of these - saves a lot of new SQL code...
+			qa_db_post_recount_votes($postid);
+			qa_db_post_recount_flags($postid);
+		}
+		
+		$postuserids=qa_db_posts_get_userids($postids);
+			
+		foreach ($postuserids as $postuserid)
+			qa_db_points_update_ifuser($postuserid, array('avoteds','qvoteds', 'upvoteds', 'downvoteds'));
+	}
 
 	
 	function qa_send_new_confirm($userid)
@@ -189,6 +235,8 @@
 	Set a new email confirmation code for the user and send it out
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
 		require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 		require_once QA_INCLUDE_DIR.'qa-app-emails.php';
@@ -207,6 +255,8 @@
 	Set a new email confirmation code for the user and return the corresponding link
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
 		
 		$emailcode=qa_db_user_rand_emailcode();
@@ -221,10 +271,13 @@
 	Complete the email confirmation process for the user
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
 		require_once QA_INCLUDE_DIR.'qa-app-cookies.php';
 		
 		qa_db_user_set_flag($userid, QA_USER_FLAGS_EMAIL_CONFIRMED, true);
+		qa_db_user_set_flag($userid, QA_USER_FLAGS_MUST_CONFIRM, false);
 		qa_db_user_set($userid, 'emailcode', ''); // to prevent re-use of the code
 
 		qa_report_event('u_confirmed', $userid, $handle, qa_cookie_get(), array(
@@ -238,6 +291,8 @@
 	Start the 'I forgot my password' process for $userid, sending reset code
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-users.php';
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-app-emails.php';
@@ -260,6 +315,8 @@
 	Successfully finish the 'I forgot my password' process for $userid, sending new password
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-util-string.php';
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-app-emails.php';
@@ -301,6 +358,8 @@
 	Set the avatar of $userid to the image in $imagedata, and remove $oldblobid from the database if not null
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-util-image.php';
 		
 		$imagedata=qa_image_constrain_data($imagedata, $width, $height, qa_opt('avatar_store_size'));
@@ -308,7 +367,7 @@
 		if (isset($imagedata)) {
 			require_once QA_INCLUDE_DIR.'qa-db-blobs.php';
 
-			$newblobid=qa_db_blob_create($imagedata, 'jpeg', null, $userid, null, @$_SERVER['REMOTE_ADDR']);
+			$newblobid=qa_db_blob_create($imagedata, 'jpeg', null, $userid, null, qa_remote_ip_address());
 			
 			if (isset($newblobid)) {
 				qa_db_user_set($userid, 'avatarblobid', $newblobid);

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-search.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for search page
 
 
@@ -31,30 +30,49 @@
 	}
 
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
+	require_once QA_INCLUDE_DIR.'qa-app-options.php';
+	require_once QA_INCLUDE_DIR.'qa-app-search.php';
 
 
 //	Perform the search if appropriate
 
 	if (strlen(qa_get('q'))) {
-		require_once QA_INCLUDE_DIR.'qa-db-selects.php';
-		require_once QA_INCLUDE_DIR.'qa-util-string.php';
-
+	
+	//	Pull in input parameters
+	
 		$inquery=trim(qa_get('q'));
-		$words=qa_string_to_words($inquery);
-		$retrieve=2*QA_DB_RETRIEVE_QS_AS+1; // get enough results to be able to give some idea of how many pages of search results there are
+		$userid=qa_get_logged_in_userid();
+		$start=qa_get_start();
 		
-		$questions=qa_db_select_with_pending(
-			qa_db_search_posts_selectspec($qa_login_userid, $words, $words, $words, $words, $inquery, $qa_start, false, $retrieve)
-		);
+		$display=qa_opt_if_loaded('page_size_search');
+		$count=2*(isset($display) ? $display : QA_DB_RETRIEVE_QS_AS)+1;
+			// get enough results to be able to give some idea of how many pages of search results there are
+		
+	//	Perform the search using appropriate module
+
+		$results=qa_get_search_results($inquery, $start, $count, $userid, false, false);
+		
+	//	Count and truncate results
 		
 		$pagesize=qa_opt('page_size_search');
-		$gotcount=count($questions);
-		$questions=array_slice($questions, 0, $pagesize);
-		$usershtml=qa_userids_handles_html($questions);
+		$gotcount=count($results);
+		$results=array_slice($results, 0, $pagesize);
 		
-		qa_report_event('search', $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, array(
+	//	Retrieve extra information on users	
+		
+		$fullquestions=array();
+		
+		foreach ($results as $result)
+			if (isset($result['question']))
+				$fullquestions[]=$result['question'];
+				
+		$usershtml=qa_userids_handles_html($fullquestions);
+		
+	//	Report the search event
+		
+		qa_report_event('search', $userid, qa_get_logged_in_handle(), qa_cookie_get(), array(
 			'query' => $inquery,
-			'start' => $qa_start,
+			'start' => $start,
 		));
 	}
 
@@ -63,11 +81,10 @@
 
 	$qa_content=qa_content_prepare(true);
 
-	if (strlen(qa_get('q')))
+	if (strlen(qa_get('q'))) {
 		$qa_content['search']['value']=qa_html($inquery);
 	
-	if (isset($questions)) {
-		if (count($questions))
+		if (count($results))
 			$qa_content['title']=qa_lang_html_sub('main/results_for_x', qa_html($inquery));
 		else
 			$qa_content['title']=qa_lang_html_sub('main/no_results_for_x', qa_html($inquery));
@@ -77,17 +94,44 @@
 		);
 		
 		$qa_content['q_list']['qs']=array();
-		foreach ($questions as $question) {
-			$fields=qa_post_html_fields($question, $qa_login_userid, $qa_cookieid, $usershtml, null, qa_post_html_defaults('Q'));
-				
-			$fields['url']=qa_path_html(qa_q_request($question['postid'], $question['title']),
-				null, null, null, qa_search_max_match_anchor($question));
+		
+		$questionoptions=qa_post_html_defaults('Q');
+		
+		foreach ($results as $result)
+			if (!isset($result['question'])) { // if we have any non-question results, display with less statistics
+				$questionoptions['voteview']=false;
+				$questionoptions['answersview']=false;
+				$questionoptions['viewsview']=false;
 
+				$fakeoptions=$questionoptions;
+				$fakeoptions['whoview']=false;
+				$fakeoptions['whenview']=false;
+				$fakeoptions['whatview']=false;
+				
+				break;
+			}
+		
+		foreach ($results as $result) {
+			if (isset($result['question']))
+				$fields=qa_post_html_fields($result['question'], $userid, qa_cookie_get(), $usershtml, null, $questionoptions);
+			
+			elseif (isset($result['url']))
+				$fields=array(
+					'what' => qa_html($result['url']),
+					'meta_order' => qa_lang_html('main/meta_order'),
+				);
+
+			else
+				continue; // nothing to show here
+			
+			$fields['title']=qa_html($result['title']);
+			$fields['url']=qa_html($result['url']);
+			
 			$qa_content['q_list']['qs'][]=$fields;
 		}
 
-		$qa_content['page_links']=qa_html_page_links($qa_request, $qa_start, $pagesize, $qa_start+$gotcount,
-			qa_opt('pages_prev_next'), array('q' => $inquery), $gotcount>=$retrieve);
+		$qa_content['page_links']=qa_html_page_links(qa_request(), $start, $pagesize, $start+$gotcount,
+			qa_opt('pages_prev_next'), array('q' => $inquery), $gotcount>=$count);
 		
 		if (qa_opt('feed_for_search'))
 			$qa_content['feed']=array(
@@ -95,11 +139,12 @@
 				'label' => qa_lang_html_sub('main/results_for_x', qa_html($inquery)),
 			);
 
+		if (empty($qa_content['page_links']))
+			$qa_content['suggest_next']=qa_html_suggest_qs_tags(qa_using_tags());
+
 	} else
-		$qa_content['title']=qa_lang_html('main/search_title');
+		$qa_content['error']=qa_lang_html('main/search_explanation');
 	
-	if (empty($qa_content['page_links']))
-		$qa_content['suggest_next']=qa_html_suggest_qs_tags(qa_using_tags());
 
 		
 	return $qa_content;

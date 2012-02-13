@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-image.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Outputs image for a specific blob at a specific size, caching as appropriate
 
 
@@ -25,22 +24,34 @@
 	More about this license: http://www.question2answer.org/license.php
 */
 
+
 //	Ensure no PHP errors are shown in the image data
 
 	@ini_set('display_errors', 0);
+	
+	function qa_image_db_fail_handler()
+	{
+		header('HTTP/1.1 500 Internal Server Error');
+		qa_exit('error');
+	}
+	
+
+//	Load the Q2A base file which sets up a bunch of crucial stuff
+
+	require 'qa-base.php';
+
+	qa_report_process_stage('init_image');
+
+
+//	Retrieve the scaled image from the cache if available
 
 	require_once QA_INCLUDE_DIR.'qa-db-cache.php';
 	
-	function qa_blob_image_db_fail_handler()
-	{
-		exit;
-	}
+	qa_db_connect('qa_image_db_fail_handler');
 	
-	$blobid=@$qa_request_lc_parts[1];
-	$size=(int)qa_get('s');
+	$blobid=qa_get('qa_blobid');
+	$size=(int)qa_get('qa_size');
 	$cachetype='i_'.$size;
-	
-	qa_base_db_connect('qa_blob_image_db_fail_handler');
 	
 	$content=qa_db_cache_get($cachetype, $blobid); // see if we've cached the scaled down version
 	
@@ -54,6 +65,9 @@
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-db-blobs.php';
 		require_once QA_INCLUDE_DIR.'qa-util-image.php';
+		
+
+	//	Otherwise retrieve the raw image and scale as appropriate
 		
 		$blob=qa_db_blob_read($blobid);
 		
@@ -78,7 +92,7 @@
 		}
 	}
 
-	qa_base_db_disconnect();
+	qa_db_disconnect();
 
 
 /*

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/basic-adsense/qa-plugin.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Initiates Adsense widget plugin
 
 
@@ -35,6 +34,7 @@
 	Plugin Author URI: http://www.question2answer.org/
 	Plugin License: GPLv2
 	Plugin Minimum Question2Answer Version: 1.4
+	Plugin Update Check URI: 
 */
 
 

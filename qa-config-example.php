@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-config-example.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: After renaming, use this to set up database details and other stuff
 
 
@@ -54,8 +53,8 @@
 	 OPTIONAL CONSTANT DEFINITIONS, INCLUDING SUPPORT FOR SINGLE SIGN-ON
 	======================================================================
 
-	QA_MYSQL_TABLE_PREFIX will be added to table names, to allow multiple datasets
-	in a single MySQL database, or to include the QA tables in an existing database.
+	QA_MYSQL_TABLE_PREFIX will be added to table names, to allow multiple datasets in a single
+	MySQL database, or to include the Question2Answer tables in an existing MySQL database.
 */
 
 	define('QA_MYSQL_TABLE_PREFIX', 'qa_');
@@ -63,17 +62,16 @@
 /*
 	If you wish, you can define QA_MYSQL_USERS_PREFIX separately from QA_MYSQL_TABLE_PREFIX.
 	If so, it is used instead of QA_MYSQL_TABLE_PREFIX as the prefix for tables containing
-	information about QA user accounts (not including users' activity and points). To share a
-	single user base between multiple QA sites, use the same values for all the QA_MYSQL_*
-	constants in each site's qa-config.php file, with the exception of QA_MYSQL_TABLE_PREFIX.
+	information about user accounts (not including users' activity and points). This allows
+	multiple Q2A sites to have shared logins and users, but separate posts and activity.
 
 	define('QA_MYSQL_USERS_PREFIX', 'qa_users_');
 */
 
 /*
-	If you wish, you can define QA_COOKIE_DOMAIN so that any cookies created by QA are assigned
+	If you wish, you can define QA_COOKIE_DOMAIN so that any cookies created by Q2A are assigned
 	to a specific domain name, instead of the full domain name of the request by default. This is
-	useful if you're running multiple QA sites on subdomains with a shared user base. 
+	useful if you're running multiple Q2A sites on subdomains with a shared user base. 
 	
 	define('QA_COOKIE_DOMAIN', '.example.com'); // be sure to keep the leading period
 */
@@ -93,16 +91,15 @@
 */
 
 /*
-	Flags for using external code - set to true if you're replacing default functions
+	Set QA_EXTERNAL_USERS to true to use your user identification code in qa-external/qa-external-users.php
+	This allows you to integrate with your existing user database and management system. For more details,
+	consult the online documentation on installing Question2Answer with single sign-on.
 	
-	QA_EXTERNAL_LANG to use your language translation logic in qa-external/qa-external-lang.php
-	QA_EXTERNAL_USERS to use your user identification code in qa-external/qa-external-users.php
-	QA_EXTERNAL_EMAILER to use your email sending function in qa-external/qa-external-emailer.php
+	The constants QA_EXTERNAL_LANG and QA_EXTERNAL_EMAILER are deprecated from Q2A 1.5 since the same
+	effect can now be achieved in plugins by using function overrides.
 */
 	
 	define('QA_EXTERNAL_USERS', false);
-	define('QA_EXTERNAL_LANG', false);
-	define('QA_EXTERNAL_EMAILER', false);
 
 /*
 	Out-of-the-box WordPress 3.x integration - to integrate with your WordPress site and user
@@ -114,40 +111,52 @@
 */
 
 /*
-	Some settings to help optimize your QA site's performance.
+	Some settings to help optimize your Question2Answer site's performance.
 	
 	If QA_HTML_COMPRESSION is true, HTML web pages will be output using Gzip compression, if
 	the user's browser indicates this is supported. This will increase the performance of your
-	site, but will make debugging harder if PHP does not complete execution.
+	site, but may make debugging harder if PHP does not complete execution.
 	
-	QA_MAX_LIMIT_START is the maximum start parameter that can be requested. As this gets
-	higher, queries tend to get slower, since MySQL must examine more information. Very high
-	start numbers are usually only requested by search engine robots anyway.
+	QA_MAX_LIMIT_START is the maximum start parameter that can be requested, for paging through
+	long lists of questions, etc... As the start parameter gets higher, queries tend to get
+	slower, since MySQL must examine more information. Very high start numbers are usually only
+	requested by search engine robots anyway.
 	
 	If a word is used QA_IGNORED_WORDS_FREQ times or more in a particular way, it is ignored
 	when searching or finding related questions. This saves time by ignoring words which are so
 	common that they are probably not worth matching on.
+	
+	Set QA_ALLOW_UNINDEXED_QUERIES to true if you don't mind running some database queries which
+	are not indexed efficiently. For example, this will enable browsing unanswered questions per
+	category. If your database becomes large, these queries could become costly.
 
 	Set QA_OPTIMIZE_LOCAL_DB to true if your web server and MySQL are running on the same box.
-	When viewing a page on your site, this will use several simple MySQL queries instead of one
-	complex one, which makes sense since there is no latency for localhost access.
+	When viewing a page on your site, this will use many simple MySQL queries instead of fewer
+	complex ones, which makes sense since there is no latency for localhost access.
+	
+	Set QA_OPTIMIZE_DISTANT_DB to true if your web server and MySQL are far enough apart to
+	create significant latency. This will minimize the number of database queries as much as
+	is possible, even at the cost of significant additional processing at each end.
 	
 	Set QA_PERSISTENT_CONN_DB to true to use persistent database connections. Only use this if
 	you are absolutely sure it is a good idea under your setup - generally it is not.
 	For more information: http://www.php.net/manual/en/features.persistent-connections.php
 	
-	Set QA_DEBUG_PERFORMANCE to true to show detailed performance profiling information.
+	Set QA_DEBUG_PERFORMANCE to true to show detailed performance profiling information at the
+	bottom of every Question2Answer page.
 */
 
 	define('QA_HTML_COMPRESSION', true);
 	define('QA_MAX_LIMIT_START', 19999);
 	define('QA_IGNORED_WORDS_FREQ', 10000);
+	define('QA_ALLOW_UNINDEXED_QUERIES', false);
 	define('QA_OPTIMIZE_LOCAL_DB', false);
+	define('QA_OPTIMIZE_DISTANT_DB', false);
 	define('QA_PERSISTENT_CONN_DB', false);
 	define('QA_DEBUG_PERFORMANCE', false);
 	
 /*
-	And lastly... if you want to, you can define any constant from qa-db-maxima.php in this
+	And lastly... if you want to, you can predefine any constant from qa-db-maxima.php in this
 	file to override the default setting. Just make sure you know what you're doing!
 */
 	

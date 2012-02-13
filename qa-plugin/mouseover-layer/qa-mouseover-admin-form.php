@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/mouseover-layer/qa-mouseover-admin-form.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Generic module class for mouseover layer plugin to provide admin form and default option
 
 
@@ -32,7 +31,8 @@
 			if ($option=='mouseover_content_max_len')
 				return 480;
 		}
-		
+	
+	
 		function admin_form(&$qa_content)
 		{
 			$saved=false;
@@ -52,7 +52,7 @@
 				
 				'fields' => array(
 					array(
-						'label' => 'Show content on mouseover in question lists',
+						'label' => 'Show content preview on mouseover in question lists',
 						'type' => 'checkbox',
 						'value' => qa_opt('mouseover_content_on'),
 						'tags' => 'NAME="mouseover_content_on_field" ID="mouseover_content_on_field"',
@@ -60,7 +60,8 @@
 					
 					array(
 						'id' => 'mouseover_content_max_len_display',
-						'label' => 'Maximum number of characters to show:',
+						'label' => 'Maximum length of preview:',
+						'suffix' => 'characters',
 						'type' => 'number',
 						'value' => (int)qa_opt('mouseover_content_max_len'),
 						'tags' => 'NAME="mouseover_content_max_len_field"',
@@ -76,7 +77,7 @@
 			);
 		}
 		
-	};
+	}
 	
 
 /*

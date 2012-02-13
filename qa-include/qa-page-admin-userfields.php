@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-userfields.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for admin page for editing custom user fields
 
 
@@ -159,7 +158,7 @@
 	);
 	
 	$qa_content['form']=array(
-		'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+		'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 		
 		'style' => 'tall',
 		
@@ -223,8 +222,8 @@
 	
 	$qa_content['focusid']='name';
 
-
 	$qa_content['navigation']['sub']=qa_admin_sub_navigation();
+
 	
 	return $qa_content;
 

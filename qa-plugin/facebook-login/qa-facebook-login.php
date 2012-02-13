@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/facebook-login/qa-facebook-login.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Login module class for Facebook login plugin
 
 
@@ -29,12 +28,14 @@
 		
 		var $directory;
 		var $urltoroot;
+
 		
 		function load_module($directory, $urltoroot)
 		{
 			$this->directory=$directory;
 			$this->urltoroot=$urltoroot;
 		}
+
 		
 		function check_login()
 		{
@@ -43,58 +44,65 @@
 			$testfacebook=false;
 			
 			foreach ($_COOKIE as $key => $value)
-				if (substr($key, 0, 4)=='fbs_')
+				if (substr($key, 0, 5)=='fbsr_')
 					$testfacebook=true;
 					
 			if (!$testfacebook) // to save making a database query for qa_opt() if there's no point
 				return;
-			
+				
 			$app_id=qa_opt('facebook_app_id');
 			$app_secret=qa_opt('facebook_app_secret');
 			
 			if (!(strlen($app_id) && strlen($app_secret)))
 				return;
-			
-			if (isset($_COOKIE['fbs_'.$app_id])) {
-				$args = array();
-				parse_str(trim($_COOKIE['fbs_'.$app_id], '\\"'), $args);
-				ksort($args);
-
-				$payload = '';
-				foreach ($args as $key => $value)
-					if ($key != 'sig')
-						$payload.=$key.'='.$value;
-						
-				if (md5($payload.qa_opt('facebook_app_secret'))==$args['sig']) {
-					$rawuser=qa_retrieve_url('https://graph.facebook.com/me?access_token='.$args['access_token'].'&fields=email,name,verified,location,website,about,picture');
-					
-					if (strlen($rawuser)) {
-						require_once $this->directory.'JSON.php';
-						
-						$json=new Services_JSON(SERVICES_JSON_LOOSE_TYPE);
-						$user=$json->decode($rawuser);
-						
-						if (is_array($user))
-							qa_log_in_external_user('facebook', $args['uid'], array(
-								'email' => @$user['email'],
-								'handle' => @$user['name'],
-								'confirmed' => @$user['verified'],
-								'name' => @$user['name'],
-								'location' => @$user['location']['name'],
-								'website' => @$user['website'],
-								'about' => @$user['about'],
-								'avatar' => strlen(@$user['picture']) ? qa_retrieve_url($user['picture']) : null,
-							));
-
-					}
+				
+			if (!function_exists('json_decode')) { // work around fact that PHP might not have JSON extension installed
+				require_once $this->directory.'JSON.php';
+				
+				function json_decode($json)
+				{
+					$decoder=new Services_JSON(SERVICES_JSON_LOOSE_TYPE);
+					return $decoder->decode($json);
 				}
 			}
+			
+			require_once $this->directory.'facebook.php';
+			
+			$facebook = new Facebook(array(
+				'appId'  => qa_opt('facebook_app_id'),
+				'secret' => qa_opt('facebook_app_secret'),
+				'cookie' => true,
+			));
+			
+			$fb_userid=$facebook->getUser();
+			
+			if ($fb_userid)
+				try {
+					$user=$facebook->api('/me?fields=email,name,verified,location,website,about,picture');
+				
+					if (is_array($user))
+						qa_log_in_external_user('facebook', $fb_userid, array(
+							'email' => @$user['email'],
+							'handle' => @$user['name'],
+							'confirmed' => @$user['verified'],
+							'name' => @$user['name'],
+							'location' => @$user['location']['name'],
+							'website' => @$user['website'],
+							'about' => @$user['bio'],
+							'avatar' => strlen(@$user['picture']) ? qa_retrieve_url($user['picture']) : null,
+						));
+
+				} catch (FacebookApiException $e) {
+					$facebookuserid=null;
+				}
 		}
 		
+
 		function match_source($source)
 		{
 			return $source=='facebook';
 		}
+
 		
 		function login_html($tourl, $context)
 		{
@@ -102,20 +110,10 @@
 
 			if (!strlen($app_id))
 				return;
-
-?>		
-<div id="fb-root"></div>
-<script src="http://connect.facebook.net/en_US/all.js"></script>
-<script>
-	FB.init({appId: <?php echo qa_js($app_id)?>, status: true, cookie: true, xfbml: true});
-	FB.Event.subscribe('auth.sessionChange', function(response) {
-		window.location=<?php echo qa_js($tourl)?>;
-	});
-</script>
-<fb:login-button perms="email,user_about_me,user_location,user_website"></fb:login-button>
-<?php
-
+				
+			$this->facebook_html($tourl, false);
 		}
+
 		
 		function logout_html($tourl)
 		{
@@ -124,23 +122,47 @@
 			if (!strlen($app_id))
 				return;
 				
-			if (isset($_COOKIE['fbs_'.$app_id])) { // check we still have a Facebook cookie ...
-
-?>		
-<span id="fb-root"></span>
-<script src="http://connect.facebook.net/en_US/all.js"></script>
-<script>
-	FB.init({appId: <?php echo qa_js($app_id)?>, status: true, cookie: true, xfbml: true});
-	FB.Event.subscribe('auth.sessionChange', function(response) {
-		window.location=<?php echo qa_js($tourl)?>;
-	});
-</script>
-<fb:login-button autologoutlink="true"></fb:login-button>
-<?php
-
-			} else // ... if not, show a standard logout link, since sometimes the redirect to Q2A's logout page doesn't complete
+			if (isset($_COOKIE['fbsr_'.$app_id])) // check we still have a Facebook cookie ...
+				$this->facebook_html($tourl, true);
+			else // ... if not, show a standard logout link, since sometimes the redirect to Q2A's logout page doesn't complete
 				echo '<A HREF="'.qa_html($tourl).'">'.qa_lang_html('main/nav_logout').'</A>';
 		}
+		
+
+		function facebook_html($tourl, $logout)
+		{
+
+?>
+      <div id="fb-root" style="display:inline;"></div>
+      <script>
+        window.fbAsyncInit = function() {
+          FB.init({
+            appId      : <?php echo qa_js(qa_opt('facebook_app_id'), true)?>,
+            status     : true, 
+            cookie     : true,
+            xfbml      : true,
+            oauth      : true
+          });
+
+         FB.Event.subscribe('<?php echo $logout ? 'auth.logout' : 'auth.login'?>', function(response) {
+           setTimeout("window.location=<?php echo qa_js($tourl)?>", 100);
+         });
+        };
+        (function(d){
+           var js, id = 'facebook-jssdk'; if (d.getElementById(id)) {return;}
+           js = d.createElement('script'); js.id = id; js.async = true;
+           js.src = "//connect.facebook.net/en_US/all.js";
+           d.getElementsByTagName('head')[0].appendChild(js);
+         }(document));
+      </script>
+      <div class="fb-login-button" style="display:inline;" <?php echo $logout ? 'autologoutlink="true"' : 'scope="email,user_about_me,user_location,user_website"'?>>
+      	<?php echo qa_lang_html($logout ? 'main/nav_logout' : 'main/nav_login')?>
+      </div>
+
+<?php
+		
+		}
+		
 		
 		function admin_form()
 		{
@@ -159,13 +181,13 @@
 				
 				'fields' => array(
 					array(
-						'label' => 'Your Facebook App ID:',
+						'label' => 'Facebook App ID:',
 						'value' => qa_html(qa_opt('facebook_app_id')),
 						'tags' => 'NAME="facebook_app_id_field"',
 					),
 
 					array(
-						'label' => 'Your Facebook App Secret:',
+						'label' => 'Facebook App Secret:',
 						'value' => qa_html(qa_opt('facebook_app_secret')),
 						'tags' => 'NAME="facebook_app_secret_field"',
 						'error' => $ready ? null : 'To use Facebook Login, please <A HREF="http://developers.facebook.com/setup/" TARGET="_blank">set up a Facebook application</A>.',
@@ -181,7 +203,7 @@
 			);
 		}
 		
-	};
+	}
 	
 
 /*

@@ -1,15 +1,14 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-points.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: Controller for admin page for user points
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Controller for admin page for settings about user points
 
 
 	This program is free software; you can redistribute it and/or
@@ -34,6 +33,7 @@
 	require_once QA_INCLUDE_DIR.'qa-db-points.php';
 	require_once QA_INCLUDE_DIR.'qa-app-options.php';
 	require_once QA_INCLUDE_DIR.'qa-app-admin.php';
+	require_once QA_INCLUDE_DIR.'qa-util-sort.php';
 	
 	
 //	Check admin privileges
@@ -139,16 +139,15 @@
 				unset($optionfield['note']);
 				break;
 				
-			case 'points_per_q_voted':
-			case 'points_per_a_voted':
-				$prefix='&#177;';
-				break;
-				
+			case 'points_per_q_voted_up':
+			case 'points_per_a_voted_up':
 			case 'points_q_voted_max_gain':
 			case 'points_a_voted_max_gain':
 				$prefix='+';
 				break;
 			
+			case 'points_per_q_voted_down':
+			case 'points_per_a_voted_down':
 			case 'points_q_voted_max_loss':
 			case 'points_a_voted_max_loss':
 				$prefix='&ndash;';
@@ -167,9 +166,14 @@
 		
 		$qa_content['form']['fields'][$optionname]=$optionfield;
 	}
-
+	
+	qa_array_insert($qa_content['form']['fields'], 'points_post_a', array('blank0' => array('type' => 'blank')));
+	qa_array_insert($qa_content['form']['fields'], 'points_vote_up_q', array('blank1' => array('type' => 'blank')));
+	qa_array_insert($qa_content['form']['fields'], 'points_multiple', array('blank2' => array('type' => 'blank')));
+	
 	
 	$qa_content['navigation']['sub']=qa_admin_sub_navigation();
+
 	
 	return $qa_content;
 

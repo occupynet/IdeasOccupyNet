@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-reset.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for password reset page (comes after forgot page)
 
 
@@ -36,7 +35,7 @@
 	if (QA_FINAL_EXTERNAL_USERS)
 		qa_fatal_error('User login is handled by external code');
 		
-	if (isset($qa_login_userid))
+	if (qa_is_logged_in())
 		qa_redirect('');
 		
 
@@ -51,10 +50,10 @@
 		
 		$errors=array();
 		
-		if (strpos($inemailhandle, '@')===false) // handles can't contain @ symbol
-			$matchusers=qa_db_user_find_by_handle($inemailhandle);
-		else
+		if (qa_opt('allow_login_email_only') || (strpos($inemailhandle, '@')!==false)) // handles can't contain @ symbols
 			$matchusers=qa_db_user_find_by_email($inemailhandle);
+		else
+			$matchusers=qa_db_user_find_by_handle($inemailhandle);
 
 		if (count($matchusers)==1) { // if match more than one (should be impossible), consider it a non-match
 			require_once QA_INCLUDE_DIR.'qa-db-selects.php';
@@ -99,7 +98,7 @@
 		
 		'fields' => array(
 			'email_handle' => array(
-				'label' => qa_lang_html('users/email_handle_label'),
+				'label' => qa_opt('allow_login_email_only') ? qa_lang_html('users/email_label') : qa_lang_html('users/email_handle_label'),
 				'tags' => 'NAME="emailhandle" ID="emailhandle"',
 				'value' => qa_html(@$inemailhandle),
 				'error' => qa_html(@$errors['emailhandle']),
@@ -126,7 +125,7 @@
 		),
 	);
 	
-	$qa_content['focusid']=isset($errors['emailhandle']) ? 'emailhandle' : 'code';
+	$qa_content['focusid']=(isset($errors['emailhandle']) || !strlen(@$inemailhandle)) ? 'emailhandle' : 'code';
 
 	
 	return $qa_content;

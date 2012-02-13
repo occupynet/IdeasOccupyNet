@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/xml-sitemap/qa-xml-sitemap.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Page module class for XML sitemap plugin
 
 
@@ -35,6 +34,100 @@
 			$this->directory=$directory;
 			$this->urltoroot=$urltoroot;
 		}
+
+		
+		function option_default($option)
+		{
+			switch ($option) {
+				case 'xml_sitemap_show_questions':
+				case 'xml_sitemap_show_users':
+				case 'xml_sitemap_show_tag_qs':
+				case 'xml_sitemap_show_category_qs':
+				case 'xml_sitemap_show_categories':
+					return true;
+					break;
+			}
+		}
+	
+	
+		function admin_form()
+		{
+			require_once QA_INCLUDE_DIR.'qa-util-sort.php';
+			
+			$saved=false;
+			
+			if (qa_clicked('xml_sitemap_save_button')) {
+				qa_opt('xml_sitemap_show_questions', (int)qa_post_text('xml_sitemap_show_questions_field'));
+				
+				if (!QA_FINAL_EXTERNAL_USERS)
+					qa_opt('xml_sitemap_show_users', (int)qa_post_text('xml_sitemap_show_users_field'));
+				
+				if (qa_using_tags())
+					qa_opt('xml_sitemap_show_tag_qs', (int)qa_post_text('xml_sitemap_show_tag_qs_field'));
+					
+				if (qa_using_categories()) {
+					qa_opt('xml_sitemap_show_category_qs', (int)qa_post_text('xml_sitemap_show_category_qs_field'));
+					qa_opt('xml_sitemap_show_categories', (int)qa_post_text('xml_sitemap_show_categories_field'));
+				}
+				
+				$saved=true;
+			}
+			
+			$form=array(
+				'ok' => $saved ? 'XML sitemap settings saved' : null,
+
+				'fields' => array(
+					'questions' => array(
+						'label' => 'Include question pages',
+						'type' => 'checkbox',
+						'value' => (int)qa_opt('xml_sitemap_show_questions'),
+						'tags' => 'NAME="xml_sitemap_show_questions_field"',
+					),
+				),
+				
+				'buttons' => array(
+					array(
+						'label' => 'Save Changes',
+						'tags' => 'NAME="xml_sitemap_save_button"',
+					),
+				),
+			);
+			
+			if (!QA_FINAL_EXTERNAL_USERS)
+				$form['fields']['users']=array(
+					'label' => 'Include user pages',
+					'type' => 'checkbox',
+					'value' => (int)qa_opt('xml_sitemap_show_users'),
+					'tags' => 'NAME="xml_sitemap_show_users_field"',
+				);
+			
+			if (qa_using_tags())
+				$form['fields']['tagqs']=array(
+					'label' => 'Include question list for each tag',
+					'type' => 'checkbox',
+					'value' => (int)qa_opt('xml_sitemap_show_tag_qs'),
+					'tags' => 'NAME="xml_sitemap_show_tag_qs_field"',
+				);
+
+			if (qa_using_categories()) {
+				$form['fields']['categoryqs']=array(
+					'label' => 'Include question list for each category',
+					'type' => 'checkbox',
+					'value' => (int)qa_opt('xml_sitemap_show_category_qs'),
+					'tags' => 'NAME="xml_sitemap_show_category_qs_field"',
+				);
+
+				$form['fields']['categories']=array(
+					'label' => 'Include category browser',
+					'type' => 'checkbox',
+					'value' => (int)qa_opt('xml_sitemap_show_categories'),
+					'tags' => 'NAME="xml_sitemap_show_categories_field"',
+				);
+			}
+
+			return $form;
+		}
+
 		
 		function suggest_requests()
 		{	
@@ -46,14 +139,13 @@
 				),
 			);
 		}
+
 		
 		function match_request($request)
 		{
-			if ($request=='sitemap.xml')
-				return true;
-
-			return false;
+			return ($request=='sitemap.xml');
 		}
+
 		
 		function process_request($request)
 		{
@@ -66,73 +158,42 @@
 			echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
 			echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 		
+
 		//	Question pages
 		
-			$nextpostid=0;
-			
-			while (1) {
-				$questions=qa_db_read_all_assoc(qa_db_query_sub(
-					"SELECT postid, BINARY title AS title, upvotes, downvotes FROM ^posts WHERE postid>=# AND type='Q' ORDER BY postid LIMIT 100",
-					$nextpostid
+			if (qa_opt('xml_sitemap_show_questions')) {
+				$hotstats=qa_db_read_one_assoc(qa_db_query_sub(
+					"SELECT MIN(hotness) AS base, MAX(hotness)-MIN(hotness) AS spread FROM ^posts WHERE type='Q'"
 				));
 				
-				if (!count($questions))
-					break;
-
-				foreach ($questions as $question) {
-					$priority=0.5; // between 0 and 1 depending on up/down votes (0.5 if net votes are zero)
-					$netvotes=$question['upvotes']-$question['downvotes'];
-					
-					if ($netvotes!=0) {
-						$absvotes=abs($netvotes);
-						$signvotes=$netvotes/$absvotes;
-						$priority+=$signvotes*0.5/(1+(1/$absvotes));
-					}
-					
-					echo "\t<url>\n".
-						"\t\t<loc>".qa_path_html(qa_q_request($question['postid'], $question['title']), null, $siteurl)."</loc>\n".
-						"\t\t<priority>".$priority."</priority>\n".
-						"\t</url>\n";
-						
-					$nextpostid=max($nextpostid, $question['postid']+1);
-				}
-			}
-		
-		//	Tag pages
-			
-			if (qa_using_tags()) {
-				$nextwordid=0;
-			
+				$nextpostid=0;
+				
 				while (1) {
-					$tagwords=qa_db_read_all_assoc(qa_db_query_sub(
-						"SELECT wordid, BINARY word AS word, tagcount FROM ^words WHERE wordid>=# AND tagcount>0 ORDER BY wordid LIMIT 100",
-						$nextwordid
+					$questions=qa_db_read_all_assoc(qa_db_query_sub(
+						"SELECT postid, title, hotness FROM ^posts WHERE postid>=# AND type='Q' ORDER BY postid LIMIT 100",
+						$nextpostid
 					));
 					
-					if (!count($tagwords))
+					if (!count($questions))
 						break;
-						
-					foreach ($tagwords as $tagword) {
-						$priority=0.5/(1+(1/$tagword['tagcount'])); // between 0.25 and 0.5 depending on tag frequency
-						
-						echo "\t<url>\n".
-							"\t\t<loc>".qa_path_html('tag/'.$tagword['word'], null, $siteurl)."</loc>\n".
-							"\t\t<priority>".$priority."</priority>\n".
-							"\t</url>\n";
-							
-						$nextwordid=max($nextwordid, $tagword['wordid']+1);
-					}				
+	
+					foreach ($questions as $question) {
+						$this->sitemap_output(qa_q_request($question['postid'], $question['title']),
+							0.1+0.9*($question['hotness']-$hotstats['base'])/$hotstats['spread']);
+						$nextpostid=max($nextpostid, $question['postid']+1);
+					}
 				}
 			}
-			
+		
+
 		//	User pages
 		
-			if (!QA_FINAL_EXTERNAL_USERS) {
+			if ((!QA_FINAL_EXTERNAL_USERS) && qa_opt('xml_sitemap_show_users')) {
 				$nextuserid=0;
 				
 				while (1) {
 					$users=qa_db_read_all_assoc(qa_db_query_sub(
-						"SELECT userid, BINARY handle AS handle FROM ^users WHERE userid>=# ORDER BY userid LIMIT 100",
+						"SELECT userid, handle FROM ^users WHERE userid>=# ORDER BY userid LIMIT 100",
 						$nextuserid
 					));
 					
@@ -140,24 +201,99 @@
 						break;
 					
 					foreach ($users as $user) {
-						$priority=0.25;
-						
-						echo "\t<url>\n".
-							"\t\t<loc>".qa_path_html('user/'.$user['handle'], null, $siteurl)."</loc>\n".
-							"\t\t<priority>".$priority."</priority>\n".
-							"\t</url>\n";
-							
+						$this->sitemap_output('user/'.$user['handle'], 0.25);
 						$nextuserid=max($nextuserid, $user['userid']+1);
 					}
 				}
 			}
 			
+
+		//	Tag pages
+			
+			if (qa_using_tags() && qa_opt('xml_sitemap_show_tag_qs')) {
+				$nextwordid=0;
+			
+				while (1) {
+					$tagwords=qa_db_read_all_assoc(qa_db_query_sub(
+						"SELECT wordid, word, tagcount FROM ^words WHERE wordid>=# AND tagcount>0 ORDER BY wordid LIMIT 100",
+						$nextwordid
+					));
+					
+					if (!count($tagwords))
+						break;
+						
+					foreach ($tagwords as $tagword) {
+						$this->sitemap_output('tag/'.$tagword['word'], 0.5/(1+(1/$tagword['tagcount']))); // priority between 0.25 and 0.5 depending on tag frequency
+						$nextwordid=max($nextwordid, $tagword['wordid']+1);
+					}				
+				}
+			}
+			
+			
+		//	Question list for each category
+		
+			if (qa_using_categories() && qa_opt('xml_sitemap_show_category_qs')) {
+				$nextcategoryid=0;
+				
+				while (1) {
+					$categories=qa_db_read_all_assoc(qa_db_query_sub(
+						"SELECT categoryid, backpath FROM ^categories WHERE categoryid>=# AND qcount>0 ORDER BY categoryid LIMIT 2",
+						$nextcategoryid
+					));
+					
+					if (!count($categories))
+						break;
+						
+					foreach ($categories as $category) {
+						$this->sitemap_output('questions/'.implode('/', array_reverse(explode('/', $category['backpath']))), 0.5);
+						$nextcategoryid=max($nextcategoryid, $category['categoryid']+1);
+					}
+				}
+			}
+			
+		
+		//	Pages in category browser
+		
+			if (qa_using_categories() && qa_opt('xml_sitemap_show_categories')) {
+				$this->sitemap_output('categories', 0.5);
+				
+				$nextcategoryid=0;
+				
+				while (1) { // only find categories with a child
+					$categories=qa_db_read_all_assoc(qa_db_query_sub(
+						"SELECT parent.categoryid, parent.backpath FROM ^categories AS parent ".
+						"JOIN ^categories AS child ON child.parentid=parent.categoryid WHERE parent.categoryid>=# GROUP BY parent.categoryid LIMIT 100",
+						$nextcategoryid
+					));
+				
+					if (!count($categories))
+						break;
+						
+					foreach ($categories as $category) {
+						$this->sitemap_output('categories/'.implode('/', array_reverse(explode('/', $category['backpath']))), 0.5);
+						$nextcategoryid=max($nextcategoryid, $category['categoryid']+1);
+					}
+				}
+			}
+			
+
+		//	Finish up...
+			
 			echo "</urlset>\n";
 			
 			return null;
 		}
+		
+
+		function sitemap_output($request, $priority)
+		{
+			echo "\t<url>\n".
+				"\t\t<loc>".qa_path_html($request, null, qa_opt('site_url'))."</loc>\n".
+				"\t\t<priority>".max(0, min(1.0, $priority))."</priority>\n".
+				"\t</url>\n";
+		}
 	
-	};
+	}
 	
 
 /*

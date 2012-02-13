@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-tags.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for popular tags page
 
 
@@ -36,7 +35,8 @@
 
 //	Get popular tags
 	
-	$populartags=qa_db_select_with_pending(qa_db_popular_tags_selectspec($qa_start));
+	$start=qa_get_start();
+	$populartags=qa_db_select_with_pending(qa_db_popular_tags_selectspec($start, qa_opt_if_loaded('page_size_tags')));
 
 	$tagcount=qa_opt('cache_tagcount');
 	$pagesize=qa_opt('page_size_tags');
@@ -48,7 +48,11 @@
 
 	$qa_content['title']=qa_lang_html('main/popular_tags');
 	
-	$qa_content['ranking']=array('items' => array(), 'rows' => ceil($pagesize/qa_opt('columns_tags')), 'type' => 'tags');
+	$qa_content['ranking']=array(
+		'items' => array(),
+		'rows' => ceil($pagesize/qa_opt('columns_tags')),
+		'type' => 'tags'
+	);
 	
 	if (count($populartags)) {
 		$output=0;
@@ -65,8 +69,8 @@
 	} else
 		$qa_content['title']=qa_lang_html('main/no_tags_found');
 	
-	$qa_content['page_links']=qa_html_page_links($qa_request, $qa_start, $pagesize, $tagcount, qa_opt('pages_prev_next'));
-
+	$qa_content['page_links']=qa_html_page_links(qa_request(), $start, $pagesize, $tagcount, qa_opt('pages_prev_next'));
+	
 	if (empty($qa_content['page_links']))
 		$qa_content['suggest_next']=qa_html_suggest_ask();
 		

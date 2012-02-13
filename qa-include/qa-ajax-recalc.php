@@ -1,15 +1,14 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-ajax-recalc.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: Server-side response to Ajax recalculation requests
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Server-side response to Ajax admin recalculation requests
 
 
 	This program is free software; you can redistribute it and/or
@@ -29,14 +28,6 @@
 	require_once QA_INCLUDE_DIR.'qa-app-recalc.php';
 	
 
-	function qa_ajax_recalc_db_fail_handler()
-	{
-		echo "QA_AJAX_RESPONSE\n0\n\nA database error occurred.";
-		exit;
-	}
-
-	qa_base_db_connect('qa_ajax_recalc_db_fail_handler');
-	
 	if (qa_get_logged_in_level()>=QA_USER_LEVEL_ADMIN) {
 		$state=qa_post_text('state');
 		$stoptime=time()+3;
@@ -51,8 +42,7 @@
 		$message=qa_lang('admin/no_privileges');
 	}
 	
-	qa_base_db_disconnect();
-	
+
 	echo "QA_AJAX_RESPONSE\n1\n".$state."\n".qa_html($message);
 
 

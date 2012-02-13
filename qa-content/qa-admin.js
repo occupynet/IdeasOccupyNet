@@ -1,13 +1,12 @@
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-content/qa-admin.js
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: JS for admin pages to handle Ajax-triggered recalculations
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Javascript for admin pages to handle Ajax-triggered operations
 
 
 	This program is free software; you can redistribute it and/or
@@ -75,7 +74,7 @@ function qa_recalc_update(elem, state, noteid)
 					qa_recalc_cleanup(elem);
 				
 				} else {
-					alert('Unexpected response from server - please try again.');
+					qa_ajax_error();
 					qa_recalc_cleanup(elem);
 				}
 			}
@@ -92,18 +91,53 @@ function qa_recalc_cleanup(elem)
 	qa_recalc_running--;
 }
 
-function qa_ajax_post(operation, params, callback)
+function qa_mailing_start(noteid, pauseid)
 {
-	jQuery.extend(params, {qa:'ajax', qa_operation:operation, qa_root:qa_root, qa_request:qa_request});
-	
-	jQuery.post(qa_root, params, function(response) {
-		var header='QA_AJAX_RESPONSE';
-		var headerpos=response.indexOf(header);
-		
-		if (headerpos>=0)
-			callback(response.substr(headerpos+header.length).replace(/^\s+/, '').split("\n"));
-		else
-			callback([]);
+	qa_ajax_post('mailing', {},
+		function (lines) {
+			if (lines[0]=='1') {
+				document.getElementById(noteid).innerHTML=lines[1];
+				window.setTimeout(function() { qa_mailing_start(noteid, pauseid); }, 1); // don't recurse
+			
+			} else if (lines[0]=='0') {
+				document.getElementById(noteid).innerHTML=lines[1];
+				document.getElementById(pauseid).style.display='none';
+				
+			} else {
+				qa_ajax_error();
+			}
+		}
+	);
+}
 
-	}, 'text').error(function() { callback([]) });
+function qa_admin_click(target)
+{
+	var p=target.name.split('_');
+	
+	var params={postid:p[1], action:p[2]};
+
+	qa_ajax_post('click_admin', params,
+		function (lines) {
+			if (lines[0]=='1') {
+				qa_conceal(document.getElementById('p'+p[1]), 'q_item');
+				
+			} else {
+				qa_ajax_error();
+			}
+		}
+	);
+	
+	return false;
+}
+
+function qa_version_check(uri, versionkey, version, urikey, elem)
+{
+	var params={uri:uri, versionkey:versionkey, version:version, urikey:urikey};
+	
+	qa_ajax_post('version', params,
+		function (lines) {
+			if (lines[0]=='1')
+				document.getElementById(elem).innerHTML=lines[1];
+		}
+	);
 }

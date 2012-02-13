@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-admin.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database access functions which are specific to the admin center
 
 
@@ -31,9 +30,35 @@
 	}
 
 
+	function qa_db_mysql_version()
+/*
+	Return the current version of MySQL
+*/
+	{
+		return qa_db_read_one_value(qa_db_query_raw('SELECT VERSION()'));
+	}
+	
+	
+	function qa_db_table_size()
+/*
+	Return the total size in bytes of all tables in the Q2A database
+*/
+	{
+		$statuses=qa_db_read_all_assoc(qa_db_query_raw(
+			"SHOW TABLE STATUS"
+		));
+		
+		$size=0;
+		foreach ($statuses as $status)
+			$size+=$status['Data_length']+$status['Index_length'];
+		
+		return $size;
+	}
+	
+	
 	function qa_db_count_posts($type=null, $fromuser=null)
 /*
-	Return count of number of posts of $type in database.
+	Return a count of the number of posts of $type in database.
 	Set $fromuser to true to only count non-anonymous posts, false to only count anonymous posts
 */
 	{
@@ -128,6 +153,21 @@
 			"SELECT postid FROM ^posts WHERE createip=INET_ATON($) AND type IN ('Q', 'A', 'C')",
 			$ip
 		));
+	}
+	
+	
+	function qa_db_postids_count_dependents($postids)
+/*
+	Return an array whose keys contain the $postids which exist, and whose elements contain the number of other posts depending on each one
+*/
+	{
+		if (count($postids))
+			return qa_db_read_all_assoc(qa_db_query_sub(
+				"SELECT postid, COALESCE(childcount, 0) AS count FROM ^posts LEFT JOIN (SELECT parentid, COUNT(*) AS childcount FROM ^posts WHERE parentid IN (#) AND LEFT(type, 1) IN ('A', 'C') GROUP BY parentid) x ON postid=x.parentid WHERE postid IN (#)",
+				$postids, $postids
+			), 'postid', 'count');
+		else
+			return array();
 	}
 
 	
@@ -301,30 +341,30 @@
 	}
 	
 	
-	function qa_db_page_create($title, $flags, $tags, $heading, $content)
+	function qa_db_page_create($title, $flags, $tags, $heading, $content, $permit=null)
 /*
-	Create a new page with $title, $flags, $tags, $heading and $content in the database
+	Create a new custom page (or link) in the database
 */
 	{
 		$position=qa_db_read_one_value(qa_db_query_sub('SELECT 1+COALESCE(MAX(position), 0) FROM ^pages'));
 		
 		qa_db_query_sub(
-			'INSERT INTO ^pages (title, nav, flags, tags, heading, content, position) VALUES ($, \'\', #, $, $, $, #)',
-			$title, $flags, $tags, $heading, $content, $position
+			'INSERT INTO ^pages (title, nav, flags, permit, tags, heading, content, position) VALUES ($, \'\', #, #, $, $, $, #)',
+			$title, $flags, $permit, $tags, $heading, $content, $position
 		);
 		
 		return qa_db_last_insert_id();
 	}
 	
 	
-	function qa_db_page_set_fields($pageid, $title, $flags, $tags, $heading, $content)
+	function qa_db_page_set_fields($pageid, $title, $flags, $tags, $heading, $content, $permit=null)
 /*
-	Set the fields of $pageid to $title, $flags, $tags, $heading, $content in the database
+	Set the fields of $pageid to the values provided in the database
 */
 	{
 		qa_db_query_sub(
-			'UPDATE ^pages SET title=$, flags=#, tags=$, heading=$, content=$ WHERE pageid=#',
-			$title, $flags, $tags, $heading, $content, $pageid
+			'UPDATE ^pages SET title=$, flags=#, permit=#, tags=$, heading=$, content=$ WHERE pageid=#',
+			$title, $flags, $permit, $tags, $heading, $content, $pageid
 		);
 	}
 	

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-login.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for login page
 
 
@@ -36,31 +35,33 @@
 	if (QA_FINAL_EXTERNAL_USERS)
 		qa_fatal_error('User login is handled by external code');
 		
-	if (isset($qa_login_userid))
+	if (qa_is_logged_in())
 		qa_redirect('');
 		
 
 //	Process submitted form after checking we haven't reached rate limit
 	
-	require_once QA_INCLUDE_DIR.'qa-app-limits.php';
-
 	$passwordsent=qa_get('ps');
 
-	if (qa_limits_remaining(null, 'L')) {
-		if (qa_clicked('dologin')) {
+	if (qa_clicked('dologin')) {
+		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
+
+		if (qa_limits_remaining(null, QA_LIMIT_LOGINS)) {
 			require_once QA_INCLUDE_DIR.'qa-db-users.php';
 			require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 		
+			qa_limits_increment(null, QA_LIMIT_LOGINS);
+
 			$inemailhandle=qa_post_text('emailhandle');
 			$inpassword=qa_post_text('password');
 			$inremember=qa_post_text('remember');
 			
 			$errors=array();
 			
-			if (strpos($inemailhandle, '@')===false) // handles can't contain @ symbols
-				$matchusers=qa_db_user_find_by_handle($inemailhandle);
-			else
+			if (qa_opt('allow_login_email_only') || (strpos($inemailhandle, '@')!==false)) // handles can't contain @ symbols
 				$matchusers=qa_db_user_find_by_email($inemailhandle);
+			else
+				$matchusers=qa_db_user_find_by_handle($inemailhandle);
 	
 			if (count($matchusers)==1) { // if matches more than one (should be impossible), don't log in
 				$inuserid=$matchusers[0];
@@ -74,7 +75,7 @@
 					$topath=qa_get('to');
 					
 					if (isset($topath))
-						qa_redirect_raw($qa_root_url_relative.$topath); // path already provided as URL fragment
+						qa_redirect_raw(qa_path_to_root().$topath); // path already provided as URL fragment
 					elseif ($passwordsent)
 						qa_redirect('account');
 					else
@@ -86,13 +87,11 @@
 			} else
 				$errors['emailhandle']=qa_lang('users/user_not_found');
 				
-			qa_limits_increment(null, 'L'); // only get here if we didn't log in successfully
-
 		} else
-			$inemailhandle=qa_get('e');
+			$pageerror=qa_lang('users/login_limit');
 		
 	} else
-		$pageerror=qa_lang('users/login_limit');
+		$inemailhandle=qa_get('e');
 
 	
 //	Prepare content for theme
@@ -119,7 +118,7 @@
 		
 		'fields' => array(
 			'email_handle' => array(
-				'label' => qa_lang_html('users/email_handle_label'),
+				'label' => qa_opt('allow_login_email_only') ? qa_lang_html('users/email_label') : qa_lang_html('users/email_handle_label'),
 				'tags' => 'NAME="emailhandle" ID="emailhandle"',
 				'value' => qa_html(@$inemailhandle),
 				'error' => qa_html(@$errors['emailhandle']),
@@ -153,19 +152,15 @@
 		),
 	);
 	
-	$modulenames=qa_list_modules('login');
+	$loginmodules=qa_load_modules_with('login', 'login_html');
 	
-	foreach ($modulenames as $tryname) {
-		$module=qa_load_module('login', $tryname);
+	foreach ($loginmodules as $module) {
+		ob_start();
+		$module->login_html(qa_opt('site_url').qa_get('to'), 'login');
+		$html=ob_get_clean();
 		
-		if (method_exists($module, 'login_html')) {
-			ob_start();
-			$module->login_html(qa_opt('site_url').qa_get('to'), 'login');
-			$html=ob_get_clean();
-			
-			if (strlen($html))
-				@$qa_content['custom'].='<BR>'.$html.'<BR>';
-		}
+		if (strlen($html))
+			@$qa_content['custom'].='<BR>'.$html.'<BR>';
 	}
 
 	$qa_content['focusid']=(isset($inemailhandle) && !isset($errors['emailhandle'])) ? 'password' : 'emailhandle';

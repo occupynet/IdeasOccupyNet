@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-widgets.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for admin page for editing widgets
 
 
@@ -40,7 +39,10 @@
 	if (!strlen($widgetid))
 		$widgetid=qa_get('edit');
 		
-	$widgets=qa_db_select_with_pending(qa_db_widgets_selectspec());
+	list($widgets, $pages)=qa_db_select_with_pending(
+		qa_db_widgets_selectspec(),
+		qa_db_pages_selectspec()
+	);
 
 	if (isset($widgetid)) {
 		$editwidget=null;
@@ -67,7 +69,7 @@
 		
 //	Define an array of relevant templates we can use
 
-	$templateoptions=array(
+	$templatelangkeys=array(
 		'question' => 'admin/question_pages',
 
 		'qa' => 'main/recent_qs_as_title',
@@ -91,10 +93,25 @@
 		'login' => 'users/login_title',
 		'register' => 'users/register_title',
 		'account' => 'profile/my_account_title',
+		'favorites' => 'misc/my_favorites_title',
+		'updates' => 'misc/recent_updates_title',
 
 		'ip' => 'admin/ip_address_pages',
 		'admin' => 'admin/admin_title',
 	);
+	
+	$templateoptions=array();
+
+	if (isset($module) && method_exists($module, 'allow_template')) {
+		foreach ($templatelangkeys as $template => $langkey)
+			if ($module->allow_template($template))
+				$templateoptions[$template]=qa_lang_html($langkey);
+				
+		if ($module->allow_template('custom'))
+			foreach ($pages as $page)
+				if (!($page['flags']&QA_PAGE_FLAGS_EXTERNAL))
+					$templateoptions['custom-'.$page['pageid']]=qa_html($page['title']);
+	}
 	
 
 //	Process saving an old or new widget
@@ -118,7 +135,7 @@
 				if (qa_post_text('template_all'))
 					$intemplates[]='all';
 				
-				foreach ($templateoptions as $template => $langkey)
+				foreach (array_keys($templateoptions) as $template)
 					if (qa_post_text('template_'.$template))
 						$intemplates[]=$template;
 						
@@ -204,7 +221,7 @@
 	$positionvalue=@$positionoptions[$editwidget['place'].$editwidget['position']];
 	
 	$qa_content['form']=array(
-		'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+		'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 		
 		'style' => 'tall',
 		
@@ -265,14 +282,12 @@
 		),
 	);
 	
-	if (method_exists($module, 'allow_template'))
-		foreach ($templateoptions as $template => $langkey)
-			if ($module->allow_template($template))
-				$qa_content['form']['fields']['templates']['html'].=
-					'<INPUT TYPE="checkbox" NAME="template_'.$template.'"'.
-					(is_numeric(strpos(','.@$editwidget['tags'].',', ','.$template.',')) ? ' CHECKED' : '').
-					'/>'.qa_lang_html($langkey).'<BR/>';
-					
+	foreach ($templateoptions as $template => $optionhtml)
+		$qa_content['form']['fields']['templates']['html'].=
+			'<INPUT TYPE="checkbox" NAME="template_'.qa_html($template).'"'.
+			(is_numeric(strpos(','.@$editwidget['tags'].',', ','.$template.',')) ? ' CHECKED' : '').
+			'/> '.$optionhtml.'<BR/>';
+			
 	if (isset($editwidget['widgetid']))
 		qa_set_display_rules($qa_content, array(
 			'templates_display' => '!(dodelete||template_all)',

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-install.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: User interface for installing, upgrading and fixing the database
 
 
@@ -30,9 +29,28 @@
 		exit;
 	}
 
-
 	require_once QA_INCLUDE_DIR.'qa-db-install.php';
 	
+	qa_report_process_stage('init_install');
+
+
+//	Output start of HTML early, so we can see a nicely-formatted list of database queries when upgrading	
+
+?>
+<HTML>
+	<HEAD>
+		<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=utf-8">
+		<STYLE type="text/css">
+			body,input {font-size:16px; font-family:Verdana, Arial, Helvetica, sans-serif;}
+			body {text-align:center; width:640px; margin:64px auto;}
+			table {margin: 16px auto;}
+		</STYLE>
+	</HEAD>
+	<BODY>
+<?php
+
+
+//	Define database failure handler for install process, if not defined already (file could be included more than once)
 
 	if (!function_exists('qa_install_db_fail_handler')) {
 
@@ -51,13 +69,11 @@
 			
 			require QA_INCLUDE_DIR.'qa-install.php';
 			
-			exit;
+			qa_exit('error');
 		}
 		
 	}
-	
 
-	header('Content-type: text/html; charset=utf-8');
 
 	$success='';
 	$errorhtml='';
@@ -65,6 +81,7 @@
 	$buttons=array();
 	$fields=array();
 	$fielderrors=array();
+	$hidden=array();
 
 	if (isset($pass_failure_type)) { // this page was requested due to query failure, via the fail handler
 		switch ($pass_failure_type) {
@@ -89,7 +106,7 @@
 		}
 
 	} else { // this page was requested by user GET/POST, so handle any incoming clicks on buttons
-		qa_base_db_connect('qa_install_db_fail_handler');
+		qa_db_connect('qa_install_db_fail_handler');
 		
 		if (qa_clicked('create')) {
 			qa_db_install_tables();
@@ -99,7 +116,7 @@
 					require_once QA_INCLUDE_DIR.'qa-db-admin.php';
 					require_once QA_INCLUDE_DIR.'qa-app-format.php';
 					
-					qa_db_page_move(qa_db_page_create(get_option('blogname'), QA_PAGE_FLAGS_EXTERNAL, get_option('home'), null, null), 'O', 1);
+					qa_db_page_move(qa_db_page_create(get_option('blogname'), QA_PAGE_FLAGS_EXTERNAL, get_option('home'), null, null, null), 'O', 1);
 						// create link back to WordPress home page
 					
 					$success.='Your Question2Answer database has been created and integrated with your WordPress site.';
@@ -125,6 +142,25 @@
 			qa_db_install_tables();
 			$success.='The Question2Answer database tables have been repaired.';
 		}
+		
+		if (qa_clicked('module')) {
+			$moduletype=qa_post_text('moduletype');
+			$modulename=qa_post_text('modulename');
+			
+			$module=qa_load_module($moduletype, $modulename);
+			
+			$queries=$module->init_queries(qa_db_list_tables_lc());
+			
+			if (!empty($queries)) {
+				if (!is_array($queries))
+					$queries=array($queries);
+					
+				foreach ($queries as $query)
+					qa_db_upgrade_query($query);
+			}
+
+			$success.='The '.$modulename.' '.$moduletype.' module has completed database initialization.';
+		}
 
 		if (qa_clicked('super')) {
 			require_once QA_INCLUDE_DIR.'qa-db-users.php';
@@ -135,7 +171,7 @@
 			$inhandle=qa_post_text('handle');
 			
 			$fielderrors=array_merge(
-				qa_handle_email_validate($inhandle, $inemail),
+				qa_handle_email_filter($inhandle, $inemail),
 				qa_password_validate($inpassword)
 			);
 			
@@ -152,7 +188,7 @@
 		}
 	}
 	
-	if (is_resource(qa_db_connection()) && !@$pass_failure_from_install) {
+	if (is_resource(qa_db_connection(false)) && !@$pass_failure_from_install) {
 		$check=qa_db_check_tables(); // see where the database is at
 		
 		switch ($check) {
@@ -184,7 +220,7 @@
 				break;
 				
 			case 'non-users-missing':
-				$errorhtml='This Question2Answer site is sharing its users with another site, but it needs some additional database tables for its own content. Click below to create those.';
+				$errorhtml='This Question2Answer site is sharing its users with another Q2A site, but it needs some additional database tables for its own content. Click below to create them.';
 				$buttons=array('nonuser' => 'Create Tables');
 				break;
 				
@@ -200,11 +236,38 @@
 				
 			default:
 				require_once QA_INCLUDE_DIR.'qa-db-admin.php';
-
+	
 				if ( (!QA_FINAL_EXTERNAL_USERS) && (qa_db_count_users()==0) ) {
 					$errorhtml.="There are currently no users in the Question2Answer database.\n\nPlease enter your details below to create the super administrator:";
 					$fields=array('handle' => 'Username:', 'password' => 'Password:', 'email' => 'Email address:');
 					$buttons=array('super' => 'Create Super Administrator');
+	
+				} else {
+					$tables=qa_db_list_tables_lc();
+					
+					$moduletypes=qa_list_module_types();
+					
+					foreach ($moduletypes as $moduletype) {
+						$modules=qa_load_modules_with($moduletype, 'init_queries');
+						
+						foreach ($modules as $modulename => $module) {
+							$queries=$module->init_queries($tables);
+							if (!empty($queries)) { // also allows single query to be returned
+								$errorhtml.=strtr(qa_lang_html('admin/module_x_database_init'), array(
+									'^1' => qa_html($modulename),
+									'^2' => qa_html($moduletype),
+									'^3' => '',
+									'^4' => '',
+								));
+								
+								$buttons=array('module' => 'Initialize Database');
+	
+								$hidden['moduletype']=$moduletype;
+								$hidden['modulename']=$modulename;
+								break;
+							}
+						}
+					}
 				}
 				break;
 		}
@@ -218,18 +281,11 @@
 	}
 
 ?>
-<HTML>
-	<HEAD>
-		<META HTTP-EQUIV="Content-type" CONTENT="text/html; charset=utf-8">
-		<STYLE type="text/css">
-			body,input {font-size:16px; font-family:Verdana, Arial, Helvetica, sans-serif;}
-			body {text-align:center; width:640px; margin:64px auto;}
-			table {margin: 16px auto;}
-		</STYLE>
-	</HEAD>
-	<BODY>
+
 		<FORM METHOD="POST" ACTION="<?php echo qa_path_html('install', null, null, QA_URL_FORMAT_SAFEST)?>">
+
 <?php
+
 	if (strlen($success))
 		echo '<P><FONT COLOR="#006600">'.nl2br(qa_html($success)).'</FONT></P>'; // green
 		
@@ -257,15 +313,13 @@
 	
 	foreach ($buttons as $name => $value)
 		echo '<INPUT TYPE="submit" NAME="'.qa_html($name).'" VALUE="'.qa_html($value).'">';
+		
+	foreach ($hidden as $name => $value)
+		echo '<INPUT TYPE="hidden" NAME="'.qa_html($name).'" VALUE="'.qa_html($value).'">';
+
+	qa_db_disconnect();
 ?>
+
 		</FORM>
 	</BODY>
 </HTML>
-<?php
-	
-	qa_base_db_disconnect();
-
-
-/*
-	Omit PHP closing tag to help avoid accidental output
-*/

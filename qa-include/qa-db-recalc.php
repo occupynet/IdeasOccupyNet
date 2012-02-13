@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-recalc.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database functions for recalculations (clean-up operations)
 
 
@@ -33,6 +32,31 @@
 	require_once QA_INCLUDE_DIR.'qa-db-post-create.php';
 
 	
+//	For reindexing pages...
+
+	function qa_db_count_pages()
+/*
+	Return the number of custom pages currently in the database
+*/
+	{
+		return qa_db_read_one_value(qa_db_query_sub(
+			'SELECT COUNT(*) FROM ^pages'
+		));
+	}
+
+	
+	function qa_db_pages_get_for_reindexing($startpageid, $count)
+/*
+	Return the information to reindex up to $count pages starting from $startpageid in the database
+*/
+	{
+		return qa_db_read_all_assoc(qa_db_query_sub(
+			'SELECT pageid, flags, tags, heading, content FROM ^pages WHERE pageid>=# ORDER BY pageid LIMIT #',
+			$startpageid, $count
+		), 'pageid');
+	}
+	
+
 //	For reindexing posts...
 	
 	function qa_db_posts_get_for_reindexing($startpostid, $count)
@@ -41,7 +65,7 @@
 */
 	{
 		return qa_db_read_all_assoc(qa_db_query_sub(
-			"SELECT ^posts.postid, BINARY ^posts.title AS title, BINARY ^posts.content AS content, ^posts.format, BINARY ^posts.tags AS tags, ^posts.type, IF (^posts.type='Q', ^posts.postid, IF(parent.type='Q', parent.postid, grandparent.postid)) AS questionid FROM ^posts LEFT JOIN ^posts AS parent ON ^posts.parentid=parent.postid LEFT JOIN ^posts as grandparent ON parent.parentid=grandparent.postid WHERE ^posts.postid>=# AND ( (^posts.type='Q') OR (^posts.type='A' AND parent.type<=>'Q') OR (^posts.type='C' AND parent.type<=>'Q') OR (^posts.type='C' AND parent.type<=>'A' AND grandparent.type<=>'Q') ) ORDER BY postid LIMIT #",
+			"SELECT ^posts.postid, ^posts.title, ^posts.content, ^posts.format, ^posts.tags, ^posts.categoryid, ^posts.type, IF (^posts.type='Q', ^posts.postid, IF(parent.type='Q', parent.postid, grandparent.postid)) AS questionid, ^posts.parentid FROM ^posts LEFT JOIN ^posts AS parent ON ^posts.parentid=parent.postid LEFT JOIN ^posts as grandparent ON parent.parentid=grandparent.postid WHERE ^posts.postid>=# AND ( (^posts.type='Q') OR (^posts.type='A' AND parent.type<=>'Q') OR (^posts.type='C' AND parent.type<=>'Q') OR (^posts.type='C' AND parent.type<=>'A' AND grandparent.type<=>'Q') ) ORDER BY postid LIMIT #",
 			$startpostid, $count
 		), 'postid');
 	}
@@ -170,26 +194,35 @@
 	}
 
 	
-	function qa_db_posts_recount($firstpostid, $lastpostid)
+	function qa_db_posts_votes_recount($firstpostid, $lastpostid)
 /*
-	Recalculate the cached counts for posts $firstpostid to $lastpostid in the database
+	Recalculate the cached vote counts for posts $firstpostid to $lastpostid in the database
 */
 	{
-		require_once QA_INCLUDE_DIR.'qa-db-hotness.php';
-		
 		qa_db_query_sub(
 			'UPDATE ^posts AS x, (SELECT ^posts.postid, COALESCE(SUM(GREATEST(0,^uservotes.vote)),0) AS upvotes, -COALESCE(SUM(LEAST(0,^uservotes.vote)),0) AS downvotes, COALESCE(SUM(IF(^uservotes.flag, 1, 0)),0) AS flagcount FROM ^posts LEFT JOIN ^uservotes ON ^uservotes.postid=^posts.postid WHERE ^posts.postid>=# AND ^posts.postid<=# GROUP BY postid) AS a SET x.upvotes=a.upvotes, x.downvotes=a.downvotes, x.netvotes=a.upvotes-a.downvotes, x.flagcount=a.flagcount WHERE x.postid=a.postid',
 			$firstpostid, $lastpostid
 		);
 		
+		qa_db_hotness_update($firstpostid, $lastpostid);
+	}
+	
+	
+	function qa_db_posts_answers_recount($firstpostid, $lastpostid)
+/*
+	Recalculate the cached answer counts for posts $firstpostid to $lastpostid in the database, along with the highest netvotes of any of their answers
+*/
+	{
+		require_once QA_INCLUDE_DIR.'qa-db-hotness.php';
+		
 		qa_db_query_sub(
-			'UPDATE ^posts AS x, (SELECT parents.postid, COUNT(children.postid) AS acount FROM ^posts AS parents LEFT JOIN ^posts AS children ON parents.postid=children.parentid AND children.type=\'A\' WHERE parents.postid>=# AND parents.postid<=# GROUP BY postid) AS a SET x.acount=a.acount WHERE x.postid=a.postid',
+			'UPDATE ^posts AS x, (SELECT parents.postid, COUNT(children.postid) AS acount, COALESCE(GREATEST(MAX(children.netvotes), 0), 0) AS amaxvote FROM ^posts AS parents LEFT JOIN ^posts AS children ON parents.postid=children.parentid AND children.type=\'A\' WHERE parents.postid>=# AND parents.postid<=# GROUP BY postid) AS a SET x.acount=a.acount, x.amaxvote=a.amaxvote WHERE x.postid=a.postid',
 			$firstpostid, $lastpostid
 		);
 		
 		qa_db_hotness_update($firstpostid, $lastpostid);
 	}
-
+	
 	
 //	For recalculating user points...
 
@@ -222,18 +255,27 @@
 		$qa_userpoints_calculations=qa_db_points_calculations();
 				
 		qa_db_query_sub(
-			'DELETE FROM ^userpoints WHERE userid>=# AND userid<=#',
+			'DELETE FROM ^userpoints WHERE userid>=# AND userid<=# AND bonus=0', // delete those with no bonus
+			$firstuserid, $lastuserid
+		);
+		
+		$zeropoints='points=0';		
+		foreach ($qa_userpoints_calculations as $field => $calculation)
+			$zeropoints.=', '.$field.'=0';
+		
+		qa_db_query_sub(
+			'UPDATE ^userpoints SET '.$zeropoints.' WHERE userid>=# AND userid<=#', // zero out the rest
 			$firstuserid, $lastuserid
 		);
 		
 		if (QA_FINAL_EXTERNAL_USERS)
 			qa_db_query_sub(
-				'INSERT INTO ^userpoints (userid) SELECT DISTINCT userid FROM ^posts WHERE userid>=# AND userid<=# UNION SELECT DISTINCT userid FROM ^uservotes WHERE userid>=# AND userid<=#',
+				'INSERT IGNORE INTO ^userpoints (userid) SELECT DISTINCT userid FROM ^posts WHERE userid>=# AND userid<=# UNION SELECT DISTINCT userid FROM ^uservotes WHERE userid>=# AND userid<=#',
 				$firstuserid, $lastuserid, $firstuserid, $lastuserid
 			);
 		else
 			qa_db_query_sub(
-				'INSERT INTO ^userpoints (userid) SELECT DISTINCT userid FROM ^users WHERE userid>=# AND userid<=#',
+				'INSERT IGNORE INTO ^userpoints (userid) SELECT DISTINCT userid FROM ^users WHERE userid>=# AND userid<=#',
 				$firstuserid, $lastuserid
 			);
 		
@@ -250,7 +292,7 @@
 		}
 		
 		qa_db_query_sub(
-			'UPDATE ^userpoints SET points='.$updatepoints.' WHERE userid>=# AND userid<=#',
+			'UPDATE ^userpoints SET points='.$updatepoints.'+bonus WHERE userid>=# AND userid<=#',
 			$firstuserid, $lastuserid
 		);
 	}
@@ -268,11 +310,25 @@
 	}
 	
 	
+//	For refilling event streams...
+
+	function qa_db_qs_get_for_event_refilling($startpostid, $count)
+/*
+	Return the ids of up to $count questions in the database starting from $startpostid
+*/
+	{
+		return qa_db_read_all_values(qa_db_query_sub(
+			"SELECT postid FROM ^posts WHERE postid>=# AND LEFT(type, 1)='Q' ORDER BY postid LIMIT #",
+			$startpostid, $count
+		));
+	}
+
+
 //	For recalculating categories...
 	
 	function qa_db_posts_get_for_recategorizing($startpostid, $count)
 /*
-	Return the ids of up to $count posts (including hidden) in the database starting from $startpostid
+	Return the ids of up to $count posts (including queued/hidden) in the database starting from $startpostid
 */
 	{
 		return qa_db_read_all_values(qa_db_query_sub(
@@ -284,12 +340,12 @@
 	
 	function qa_db_posts_recalc_categoryid($firstpostid, $lastpostid)
 /*
-	Recalculate the (exact) categoryid for the posts (including hidden) between $firstpostid and $lastpostid
+	Recalculate the (exact) categoryid for the posts (including queued/hidden) between $firstpostid and $lastpostid
 	in the database, where the category of comments and answers is set by the category of the antecedent question
 */
 	{
 		qa_db_query_sub(
-			"UPDATE ^posts AS x, (SELECT ^posts.postid, IF((parent.type='Q') OR (parent.type='Q_HIDDEN'), parent.categoryid, grandparent.categoryid) AS categoryid FROM ^posts LEFT JOIN ^posts AS parent ON ^posts.parentid=parent.postid LEFT JOIN ^posts AS grandparent ON parent.parentid=grandparent.postid WHERE ^posts.postid BETWEEN # AND # AND ^posts.type IN ('A', 'C', 'A_HIDDEN', 'C_HIDDEN')) AS a SET x.categoryid=a.categoryid WHERE x.postid=a.postid",
+			"UPDATE ^posts AS x, (SELECT ^posts.postid, IF(LEFT(parent.type, 1)='Q', parent.categoryid, grandparent.categoryid) AS categoryid FROM ^posts LEFT JOIN ^posts AS parent ON ^posts.parentid=parent.postid LEFT JOIN ^posts AS grandparent ON parent.parentid=grandparent.postid WHERE ^posts.postid BETWEEN # AND # AND LEFT(^posts.type, 1)!='Q') AS a SET x.categoryid=a.categoryid WHERE x.postid=a.postid",
 			$firstpostid, $lastpostid
 		);
 	}

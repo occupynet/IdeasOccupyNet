@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/event-logger/qa-event-logger.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Event module class for event logger plugin
 
 
@@ -27,6 +26,33 @@
 
 	class qa_event_logger {
 		
+		function init_queries($tableslc)
+		{
+			if (qa_opt('event_logger_to_database')) {
+				$tablename=qa_db_add_table_prefix('eventlog');
+				
+				if (!in_array($tablename, $tableslc)) {
+					require_once QA_INCLUDE_DIR.'qa-app-users.php';
+					require_once QA_INCLUDE_DIR.'qa-db-maxima.php';
+
+					return 'CREATE TABLE ^eventlog ('.
+						'datetime DATETIME NOT NULL,'.
+						'ipaddress VARCHAR (15) CHARACTER SET ascii,'.
+						'userid '.qa_get_mysql_user_column_type().','.
+						'handle VARCHAR('.QA_DB_MAX_HANDLE_LENGTH.'),'.
+						'cookieid BIGINT UNSIGNED,'.
+						'event VARCHAR (20) CHARACTER SET ascii NOT NULL,'.
+						'params VARCHAR (800) NOT NULL,'.
+						'KEY datetime (datetime),'.
+						'KEY ipaddress (ipaddress),'.
+						'KEY userid (userid),'.
+						'KEY event (event)'.
+					') ENGINE=MyISAM DEFAULT CHARSET=utf8';
+				}
+			}
+		}
+
+		
 		function admin_form(&$qa_content)
 		{
 
@@ -41,29 +67,6 @@
 				qa_opt('event_logger_hide_header', !qa_post_text('event_logger_hide_header_field'));
 
 				$saved=true;
-			
-			//	Create the database table if database logging was switched on
-			
-				if (qa_opt('event_logger_to_database')) {
-					require_once QA_INCLUDE_DIR.'qa-app-users.php';
-					require_once QA_INCLUDE_DIR.'qa-db-maxima.php';
-					
-					qa_db_query_sub(
-						'CREATE TABLE IF NOT EXISTS ^eventlog ('.
-							'datetime DATETIME NOT NULL,'.
-							'ipaddress VARCHAR (15) CHARACTER SET ascii,'.
-							'userid '.qa_get_mysql_user_column_type().','.
-							'handle VARCHAR('.QA_DB_MAX_HANDLE_LENGTH.'),'.
-							'cookieid BIGINT UNSIGNED,'.
-							'event VARCHAR (20) CHARACTER SET ascii NOT NULL,'.
-							'params VARCHAR (800) NOT NULL,'.
-							'KEY datetime (datetime),'.
-							'KEY ipaddress (ipaddress),'.
-							'KEY userid (userid),'.
-							'KEY event (event)'.
-						') ENGINE=MyISAM DEFAULT CHARSET=utf8'
-					);			
-				}
 			}
 		
 		//	Check the validity of the currently entered directory (if any)
@@ -109,11 +112,11 @@
 					
 					array(
 						'id' => 'event_logger_directory_display',
-						'label' => 'Directory for log files (enter full path):',
+						'label' => 'Directory for log files - enter full path:',
 						'value' => qa_html($directory),
 						'tags' => 'NAME="event_logger_directory_field"',
 						'note' => $note,
-						'error' => $error,
+						'error' => qa_html($error),
 					),
 					
 					array(
@@ -133,6 +136,7 @@
 				),
 			);
 		}
+
 		
 		function value_to_text($value)
 		{
@@ -145,7 +149,8 @@
 				
 			return strtr($text, "\t\n\r", '   ');
 		}
-		
+	
+	
 		function process_event($event, $userid, $handle, $cookieid, $params)
 		{
 			if (qa_opt('event_logger_to_database')) {
@@ -157,7 +162,7 @@
 				qa_db_query_sub(
 					'INSERT INTO ^eventlog (datetime, ipaddress, userid, handle, cookieid, event, params) '.
 					'VALUES (NOW(), $, $, $, #, $, $)',
-					@$_SERVER['REMOTE_ADDR'], $userid, $handle, $cookieid, $event, $paramstring
+					qa_remote_ip_address(), $userid, $handle, $cookieid, $event, $paramstring
 				);			
 			}
 			
@@ -174,7 +179,7 @@
 				if (!strlen($cookieid))
 					$cookieid='no_cookieid';
 					
-				$ip=@$_SERVER['REMOTE_ADDR'];
+				$ip=qa_remote_ip_address();
 				if (!strlen($ip))
 					$ip='no_ipaddress';
 					
@@ -228,7 +233,7 @@
 			}
 		}
 	
-	};
+	}
 	
 
 /*

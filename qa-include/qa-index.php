@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-index.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: The Grand Central of Q2A - most requests come through here
 
 
@@ -31,148 +30,141 @@
 		define('QA_BASE_DIR', dirname(empty($_SERVER['SCRIPT_FILENAME']) ? dirname(__FILE__) : $_SERVER['SCRIPT_FILENAME']).'/');
 
 
-//	If this is an Ajax request, branch off here
+//	If this is an special non-page request, branch off here
 
-	if (@$_POST['qa']=='ajax') {
+	if (@$_POST['qa']=='ajax')
 		require 'qa-ajax.php';
-		return;
-	}
 
+	elseif (@$_GET['qa']=='image')
+		require 'qa-image.php';
 
-//	If this is a direct blob request, branch off here
-
-	if (@$_GET['qa']=='blob') {
+	elseif (@$_GET['qa']=='blob')
 		require 'qa-blob.php';
-		return;
-	}
 
-
-//	Load the QA base file which sets up a bunch of crucial functions
-	
-	require 'qa-base.php';
-
-	
-//	Determine the request and root of the installation, and the requested start position used by many pages
-	
-	$relativedepth=0;
-	$rootpath=strtr(dirname($_SERVER['PHP_SELF']), '\\', '/');
-	
-	if (isset($_GET['qa-rewrite'])) { // URLs rewritten by .htaccess
-		$qa_used_url_format=QA_URL_FORMAT_NEAT;
-		$requestparts=explode('/', qa_gpc_to_string($_GET['qa-rewrite']));
-		unset($_GET['qa-rewrite']);
-		$relativedepth=count($requestparts);
+	else {
 		
-		// Workaround for fact that Apache unescapes characters while rewriting, based on assumption that $_GET['qa-rewrite'] has
-		// right path depth, which is true do long as there are only escaped characters in the last part of the path
-		if (!empty($_SERVER['REQUEST_URI'])) {
-			$origpath=$_SERVER['REQUEST_URI'];
-			$_GET=array();
+	//	Otherwise, load the Q2A base file which sets up a bunch of crucial stuff
+		
+		require 'qa-base.php';
+		
+	
+	//	Determine the request and root of the installation, and the requested start position used by many pages
+		
+		function qa_index_set_request()
+		{
+			if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+			$relativedepth=0;
 			
-			$questionpos=strpos($origpath, '?');
-			if (is_numeric($questionpos)) {
-				$params=explode('&', substr($origpath, $questionpos+1));
+			if (isset($_GET['qa-rewrite'])) { // URLs rewritten by .htaccess
+				$urlformat=QA_URL_FORMAT_NEAT;
+				$requestparts=explode('/', qa_gpc_to_string($_GET['qa-rewrite']));
+				unset($_GET['qa-rewrite']);
+				$relativedepth=count($requestparts);
 				
-				foreach ($params as $param)
-					if (preg_match('/^([^\=]*)(\=(.*))?$/', $param, $matches))
-						$_GET[urldecode($matches[1])]=qa_string_to_gpc(urldecode(@$matches[3]));
-
-				$origpath=substr($origpath, 0, $questionpos);
+				// Workaround for fact that Apache unescapes characters while rewriting, based on assumption that $_GET['qa-rewrite'] has
+				// right path depth, which is true do long as there are only escaped characters in the last part of the path
+				if (!empty($_SERVER['REQUEST_URI'])) {
+					$origpath=$_SERVER['REQUEST_URI'];
+					$_GET=array();
+					
+					$questionpos=strpos($origpath, '?');
+					if (is_numeric($questionpos)) {
+						$params=explode('&', substr($origpath, $questionpos+1));
+						
+						foreach ($params as $param)
+							if (preg_match('/^([^\=]*)(\=(.*))?$/', $param, $matches))
+								$_GET[urldecode($matches[1])]=qa_string_to_gpc(urldecode(@$matches[3]));
+		
+						$origpath=substr($origpath, 0, $questionpos);
+					}
+					
+					$requestparts=array_slice(explode('/', urldecode($origpath)), -count($requestparts));
+				}
+				
+			} elseif (isset($_GET['qa'])) {
+				if (strpos($_GET['qa'], '/')===false) {
+					$urlformat=( (empty($_SERVER['REQUEST_URI'])) || (strpos($_SERVER['REQUEST_URI'], '/index.php')!==false) )
+						? QA_URL_FORMAT_SAFEST : QA_URL_FORMAT_PARAMS;
+					$requestparts=array(qa_gpc_to_string($_GET['qa']));
+					
+					for ($part=1; $part<10; $part++)
+						if (isset($_GET['qa_'.$part])) {
+							$requestparts[]=qa_gpc_to_string($_GET['qa_'.$part]);
+							unset($_GET['qa_'.$part]);
+						}
+				
+				} else {
+					$urlformat=QA_URL_FORMAT_PARAM;
+					$requestparts=explode('/', qa_gpc_to_string($_GET['qa']));
+				}
+				
+				unset($_GET['qa']);
+			
+			} else {
+				$phpselfunescaped=strtr($_SERVER['PHP_SELF'], '+', ' '); // seems necessary, and plus does not work with this scheme
+				$indexpath='/index.php/';
+				$indexpos=strpos($phpselfunescaped, $indexpath);
+				
+				if (is_numeric($indexpos)) {
+					$urlformat=QA_URL_FORMAT_INDEX;
+					$requestparts=explode('/', substr($phpselfunescaped, $indexpos+strlen($indexpath)));
+					$relativedepth=1+count($requestparts);
+			
+				} else {
+					$urlformat=null; // at home page so can't identify path type
+					$requestparts=array();
+				}
 			}
 			
-			$requestparts=array_slice(explode('/', urldecode($origpath)), -count($requestparts));
-		}
-		
-	} elseif (isset($_GET['qa'])) {
-		if (strpos($_GET['qa'], '/')===false) {
-			$qa_used_url_format=( (empty($_SERVER['REQUEST_URI'])) || (strpos($_SERVER['REQUEST_URI'], '/index.php')!==false) )
-				? QA_URL_FORMAT_SAFEST : QA_URL_FORMAT_PARAMS;
-			$requestparts=array(qa_gpc_to_string($_GET['qa']));
-			
-			for ($part=1; $part<10; $part++)
-				if (isset($_GET['qa_'.$part])) {
-					$requestparts[]=qa_gpc_to_string($_GET['qa_'.$part]);
-					unset($_GET['qa_'.$part]);
-				}
-		
-		} else {
-			$qa_used_url_format=QA_URL_FORMAT_PARAM;
-			$requestparts=explode('/', qa_gpc_to_string($_GET['qa']));
-		}
-		
-		unset($_GET['qa']);
-	
-	} else {
-		$phpselfunescaped=strtr($_SERVER['PHP_SELF'], '+', ' '); // seems necessary, and plus does not work with this scheme
-		$indexpath='/index.php/';
-		$indexpos=strpos($phpselfunescaped, $indexpath);
-		
-		if (is_numeric($indexpos)) {
-			$qa_used_url_format=QA_URL_FORMAT_INDEX;
-			$requestparts=explode('/', substr($phpselfunescaped, $indexpos+strlen($indexpath)));
-			$relativedepth=1+count($requestparts);
-			$rootpath=substr($phpselfunescaped, 0, $indexpos);
-	
-		} else {
-			$qa_used_url_format=null; // at home page so can't identify path type
-			$requestparts=array();
-		}
-	}
-	
-	foreach ($requestparts as $part => $requestpart) // remove any blank parts
-		if (!strlen($requestpart))
-			unset($requestparts[$part]);
-			
-	reset($requestparts);
-	$key=key($requestparts);
-	
-	if (isset($QA_CONST_PATH_MAP)) {
-		$replacement=array_search(@$requestparts[$key], $QA_CONST_PATH_MAP);
-		
-		if ($replacement!==false)
-			$requestparts[$key]=$replacement;
-	}
-
-	$qa_request=implode('/', $requestparts);
-	$qa_request_lc=strtolower($qa_request);
-
-	$qa_request_parts=explode('/', $qa_request);
-	$qa_request_lc_parts=explode('/', $qa_request_lc);
-
-	$qa_root_url_relative=($relativedepth>1) ? str_repeat('../', $relativedepth-1) : './';
-	$qa_root_url_inferred='http://'.@$_SERVER['HTTP_HOST'].$rootpath;
-	
-	if (substr($qa_root_url_inferred, -1)!='/')
-		$qa_root_url_inferred.='/';
-	
-	
-//	Check for install or url test pages
-
-	if ($qa_request_lc=='install')
-		require QA_INCLUDE_DIR.'qa-install.php';
-		
-	elseif ($qa_request_lc==('url/test/'.QA_URL_TEST_STRING))
-		require QA_INCLUDE_DIR.'qa-url-test.php';
-	
-	elseif ($qa_request_lc_parts[0]=='image')
-		require QA_INCLUDE_DIR.'qa-image.php';
-	
-	else {
-
-	//	Enable gzip compression for output (needs to come early)
-
-		if (defined('QA_HTML_COMPRESSION') ? QA_HTML_COMPRESSION : true) // on by default
-			if ($qa_request_lc!='admin/recalc') // not for lengthy processes
-				if (extension_loaded('zlib') && !headers_sent())
-					ob_start('ob_gzhandler');
+			foreach ($requestparts as $part => $requestpart) // remove any blank parts
+				if (!strlen($requestpart))
+					unset($requestparts[$part]);
 					
-	//	Route to appropriate file based on whether this is a feed request or normal page
+			reset($requestparts);
+			$key=key($requestparts);
 			
-		if ($qa_request_lc_parts[0]=='feed')
-			require QA_INCLUDE_DIR.'qa-feed.php';
-		else
-			require QA_INCLUDE_DIR.'qa-page.php';
+			$replacement=array_search(@$requestparts[$key], qa_get_request_map());
+			if ($replacement!==false)
+				$requestparts[$key]=$replacement;
+		
+			qa_set_request(
+				implode('/', $requestparts),
+				($relativedepth>1) ? str_repeat('../', $relativedepth-1) : './',
+				$urlformat
+			);
+		}
+	
+		qa_index_set_request();
+		
+		
+	//	Branch off to appropriate file for further handling
+	
+		$requestlower=strtolower(qa_request());
+		
+		if ($requestlower=='install')
+			require QA_INCLUDE_DIR.'qa-install.php';
+			
+		elseif ($requestlower==('url/test/'.QA_URL_TEST_STRING))
+			require QA_INCLUDE_DIR.'qa-url-test.php';
+		
+		else {
+	
+		//	Enable gzip compression for output (needs to come early)
+	
+			if (QA_HTML_COMPRESSION) // on by default
+				if (substr($requestlower, 0, 6)!='admin/') // not for admin pages since some of these contain lengthy processes
+					if (extension_loaded('zlib') && !headers_sent())
+						ob_start('ob_gzhandler');
+						
+			if (substr($requestlower, 0, 5)=='feed/')
+				require QA_INCLUDE_DIR.'qa-feed.php';
+			else
+				require QA_INCLUDE_DIR.'qa-page.php';
+		}
 	}
+	
+	qa_report_process_stage('shutdown');
 
 
 /*

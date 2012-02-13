@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-categories.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for page listing categories
 
 
@@ -34,7 +33,7 @@
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
 
 
-	$categoryslugs=$pass_subrequests;
+	$categoryslugs=qa_request_parts(1);
 	$countslugs=count($categoryslugs);
 
 
@@ -48,7 +47,39 @@
 	if ($countslugs && !isset($categoryid))
 		return include QA_INCLUDE_DIR.'qa-page-not-found.php';
 	
-	
+
+//	Function for recursive display of categories
+
+	function qa_category_nav_to_browse(&$navigation, $categories, $categoryid)
+	{
+		foreach ($navigation as $key => $navlink) {
+			$category=$categories[$navlink['categoryid']];
+			
+			if (!$category['childcount'])
+				unset($navigation[$key]['url']);
+			elseif ($navlink['selected']) {
+				$navigation[$key]['state']='open';
+				$navigation[$key]['url']=qa_path_html('categories/'.qa_category_path_request($categories, $category['parentid']));
+			} else
+				$navigation[$key]['state']='closed';
+				
+			$navigation[$key]['note']='';
+			
+			$navigation[$key]['note'].=
+				' - <A HREF="'.qa_path_html('questions/'.implode('/', array_reverse(explode('/', $category['backpath'])))).'">'.( ($category['qcount']==1)
+					? qa_lang_html_sub('main/1_question', '1', '1')
+					: qa_lang_html_sub('main/x_questions', number_format($category['qcount']))
+				).'</A>';
+				
+			if (strlen($category['content']))
+				$navigation[$key]['note'].=qa_html(' - '.$category['content']);
+			
+			if (isset($navlink['subnav']))
+				qa_category_nav_to_browse($navigation[$key]['subnav'], $categories, $categoryid);
+		}
+	}
+		
+
 //	Prepare content for theme
 
 	$qa_content=qa_content_prepare(false, array_keys(qa_category_path($categories, $categoryid)));
@@ -60,38 +91,7 @@
 		
 		unset($navigation['all']);
 		
-		function qa_category_nav_to_browse(&$navigation)
-		{
-			global $categories, $categoryid;
-			
-			foreach ($navigation as $key => $navlink) {
-				$category=$categories[$navlink['categoryid']];
-				
-				if (!$category['childcount'])
-					unset($navigation[$key]['url']);
-				elseif ($navlink['selected']) {
-					$navigation[$key]['state']='open';
-					$navigation[$key]['url']=qa_path_html('categories/'.qa_category_path_request($categories, $category['parentid']));
-				} else
-					$navigation[$key]['state']='closed';
-					
-				$navigation[$key]['note']='';
-				
-				$navigation[$key]['note'].=
-					' - <A HREF="'.qa_path_html('questions/'.implode('/', array_reverse(explode('/', $category['backpath'])))).'">'.( ($category['qcount']==1)
-						? qa_lang_html_sub('main/1_question', '1', '1')
-						: qa_lang_html_sub('main/x_questions', number_format($category['qcount']))
-					).'</A>';
-					
-				if (strlen($category['content']))
-					$navigation[$key]['note'].=qa_html(' - '.$category['content']);
-				
-				if (isset($navlink['subnav']))
-					qa_category_nav_to_browse($navigation[$key]['subnav']);
-			}
-		}
-		
-		qa_category_nav_to_browse($navigation);
+		qa_category_nav_to_browse($navigation, $categories, $categoryid);
 		
 		$qa_content['nav_list']=array(
 			'nav' => $navigation,

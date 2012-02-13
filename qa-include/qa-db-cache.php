@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-cache.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database-level access to cache table
 
 
@@ -30,7 +29,6 @@
 		exit;
 	}
 
-
 	require_once QA_INCLUDE_DIR.'qa-db-maxima.php';
 
 
@@ -39,6 +37,8 @@
 	Create (or replace) the item ($type, $cacheid) in the database cache table with $content
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		qa_db_query_sub(
 			'DELETE FROM ^cache WHERE lastread<NOW()-INTERVAL # SECOND',
 			QA_DB_MAX_CACHE_AGE
@@ -56,6 +56,8 @@
 	Retrieve the item ($type, $cacheid) from the database cache table
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		$content=qa_db_read_one_value(qa_db_query_sub(
 			'SELECT content FROM ^cache WHERE type=$ AND cacheid=#',
 			$type, $cacheid

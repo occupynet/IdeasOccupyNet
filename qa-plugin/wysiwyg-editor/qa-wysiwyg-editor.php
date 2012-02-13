@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/wysiwyg-editor/qa-wysiwyg-editor.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Editor module class for WYSIWYG editor plugin
 
 
@@ -33,6 +32,7 @@
 		{
 			$this->urltoroot=$urltoroot;
 		}
+
 		
 		function option_default($option)
 		{
@@ -42,12 +42,14 @@
 				return min(qa_get_max_upload_size(), 1048576);
 			}
 		}
-		
+	
+	
 		function bytes_to_mega_html($bytes)
 		{
 			return qa_html(number_format($bytes/1048576, 1));
 		}
-		
+	
+	
 		function admin_form(&$qa_content)
 		{
 			require_once QA_INCLUDE_DIR.'qa-app-blobs.php';
@@ -79,7 +81,7 @@
 
 					array(
 						'id' => 'wysiwyg_editor_upload_all_display',
-						'label' => 'Allow other content (e.g. Flash, PDF) to be uploaded',
+						'label' => 'Allow other content to be uploaded, e.g. Flash, PDF',
 						'type' => 'checkbox',
 						'value' => (int)qa_opt('wysiwyg_editor_upload_all'),
 						'tags' => 'NAME="wysiwyg_editor_upload_all_field"',
@@ -87,7 +89,8 @@
 					
 					array(
 						'id' => 'wysiwyg_editor_upload_max_size_display',
-						'label' => 'Maximum size of uploads in MB (max '.$this->bytes_to_mega_html(qa_get_max_upload_size()).'):',
+						'label' => 'Maximum size of uploads:',
+						'suffix' => 'MB (max '.$this->bytes_to_mega_html(qa_get_max_upload_size()).')',
 						'type' => 'number',
 						'value' => $this->bytes_to_mega_html(qa_opt('wysiwyg_editor_upload_max_size')),
 						'tags' => 'NAME="wysiwyg_editor_upload_max_size_field"',
@@ -103,6 +106,7 @@
 			);
 		}
 		
+	
 		function calc_quality($content, $format)
 		{
 			if ($format=='html')
@@ -112,38 +116,48 @@
 			else
 				return 0;
 		}
+
 		
-		function get_field(&$qa_content, $content, $format, $fieldname, $rows, $autofocus)
+		function get_field(&$qa_content, $content, $format, $fieldname, $rows /* $autofocus parameter deprecated */)
 		{
-			$uploadimages=qa_opt('wysiwyg_editor_upload_images');
-			$uploadall=$uploadimages && qa_opt('wysiwyg_editor_upload_all');
-			
-			$qa_content['script_src'][]=$this->urltoroot.'ckeditor.js?'.QA_VERSION;
-			
-			$qa_content['script_onloads'][]="CKEDITOR.replace(".qa_js($fieldname).
-			", {toolbar:[".
-				"['Bold','Italic','Underline','Strike'],".
-				"['Font','FontSize'],".
-				"['TextColor','BGColor'],".
-				"['Link','Unlink'],".
-				"'/',".
-				"['JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock'],".
-				"['NumberedList','BulletedList','-','Outdent','Indent','Blockquote'],".
-				"['Image','Flash','Table','HorizontalRule','Smiley','SpecialChar'],".
-				"['RemoveFormat', 'Maximize']".
-			"]".
-			", defaultLanguage:".qa_js(qa_opt('site_language')).
-			", skin:'v2'".
-			", toolbarCanCollapse:false".
-			", removePlugins:'elementspath'".
-			", resize_enabled:false".
-			", autogrow:false".
-			", startupFocus:".($autofocus ? 'true' : 'false').
-			", entities:false".
-			($uploadimages ? (", filebrowserImageUploadUrl:".qa_js(qa_path('wysiwyg-editor-upload', array('qa_only_image' => true)))) : "").
-			($uploadall ? (", filebrowserUploadUrl:".qa_js(qa_path('wysiwyg-editor-upload'))) : "").
-			"})";
-			
+			$scriptsrc=$this->urltoroot.'ckeditor.js?'.QA_VERSION;			
+			$alreadyadded=false;
+
+			if (isset($qa_content['script_src']))
+				foreach ($qa_content['script_src'] as $testscriptsrc)
+					if ($testscriptsrc==$scriptsrc)
+						$alreadyadded=true;
+					
+			if (!$alreadyadded) {
+				$uploadimages=qa_opt('wysiwyg_editor_upload_images');
+				$uploadall=$uploadimages && qa_opt('wysiwyg_editor_upload_all');
+				
+				$qa_content['script_src'][]=$scriptsrc;
+				$qa_content['script_lines'][]=array(
+					"qa_wysiwyg_editor_config={toolbar:[".
+						"['Bold','Italic','Underline','Strike'],".
+						"['Font','FontSize'],".
+						"['TextColor','BGColor'],".
+						"['Link','Unlink'],".
+						"'/',".
+						"['JustifyLeft','JustifyCenter','JustifyRight','JustifyBlock'],".
+						"['NumberedList','BulletedList','-','Outdent','Indent','Blockquote'],".
+						"['Image','Flash','Table','HorizontalRule','Smiley','SpecialChar'],".
+						"['RemoveFormat', 'Maximize']".
+					"]".
+					", defaultLanguage:".qa_js(qa_opt('site_language')).
+					", skin:'v2'".
+					", toolbarCanCollapse:false".
+					", removePlugins:'elementspath'".
+					", resize_enabled:false".
+					", autogrow:false".
+					", entities:false".
+					($uploadimages ? (", filebrowserImageUploadUrl:".qa_js(qa_path('wysiwyg-editor-upload', array('qa_only_image' => true)))) : "").
+					($uploadall ? (", filebrowserUploadUrl:".qa_js(qa_path('wysiwyg-editor-upload'))) : "").
+					"}"
+				);
+			}		
+				
 			if ($format=='html')
 				$html=$content;
 			else
@@ -155,6 +169,25 @@
 				'rows' => $rows,
 			);
 		}
+	
+	
+		function load_script($fieldname)
+		{
+			return "qa_ckeditor_".$fieldname."=CKEDITOR.replace(".qa_js($fieldname).", window.qa_wysiwyg_editor_config);";
+		}
+
+		
+		function focus_script($fieldname)
+		{
+			return "qa_ckeditor_".$fieldname.".focus();";
+		}
+
+		
+		function update_script($fieldname)
+		{
+			return "qa_ckeditor_".$fieldname.".updateElement();";
+		}
+
 		
 		function read_post($fieldname)
 		{
@@ -178,7 +211,7 @@
 			}
 		}
 	
-	};
+	}
 	
 
 /*

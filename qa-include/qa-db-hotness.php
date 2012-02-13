@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-hotness.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Functions for dealing with question hotness in the database
 
 
@@ -37,11 +36,13 @@
 	If $viewincrement is true, also increment the views counter for the post, and include that in the hotness calculation
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		if (qa_should_update_counts()) {
 			if (!isset($lastpostid))
 				$lastpostid=$firstpostid;
 			
-			$query=	'UPDATE ^posts AS x, (SELECT parents.postid, parents.created AS qcreated, COALESCE(MAX(children.created), parents.created) as acreated, COUNT(children.postid) AS acount, parents.netvotes, parents.views FROM ^posts AS parents LEFT JOIN ^posts AS children ON parents.postid=children.parentid AND children.type=\'A\' WHERE parents.postid>=# AND parents.postid<=# AND parents.type=\'Q\' GROUP BY postid) AS a SET x.hotness=('.
+			$query=	"UPDATE ^posts AS x, (SELECT parents.postid, parents.created AS qcreated, COALESCE(MAX(children.created), parents.created) as acreated, COUNT(children.postid) AS acount, parents.netvotes, parents.views FROM ^posts AS parents LEFT JOIN ^posts AS children ON parents.postid=children.parentid AND children.type='A' WHERE parents.postid>=# AND parents.postid<=# AND LEFT(parents.type, 1)='Q' GROUP BY postid) AS a SET x.hotness=(".
 				'((TO_DAYS(a.qcreated)-734138)*86400.0+TIME_TO_SEC(a.qcreated))*# + '. // zero-point is Jan 1, 2010
 				'((TO_DAYS(a.acreated)-734138)*86400.0+TIME_TO_SEC(a.acreated))*# + '.
 				'(a.acount+0.0)*# + '.
@@ -63,7 +64,7 @@
 			);
 			
 			if ($viewincrement)
-				$arguments[]=@$_SERVER['REMOTE_ADDR'];
+				$arguments[]=qa_remote_ip_address();
 	
 			 qa_db_query_raw(qa_db_apply_sub($query, $arguments));
 		}

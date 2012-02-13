@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-emails.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Wrapper functions for sending email notifications to users
 
 
@@ -33,13 +32,10 @@
 	require_once QA_INCLUDE_DIR.'qa-app-options.php';
 
 
-	$qa_notifications_suspended=0;
-	
-	
 	function qa_suspend_notifications($suspend=true)
 /*
-	Suspend the sending of all email notifications via qa_send_notification(...) if $suspend is
-	true, otherwise reinstate it. A counter is kept to allow multiple calls.
+	Suspend the sending of all email notifications via qa_send_notification(...) if $suspend is true, otherwise
+	reinstate it. A counter is kept to allow multiple calls.
 */
 	{
 		global $qa_notifications_suspended;
@@ -50,19 +46,19 @@
 	
 	function qa_send_notification($userid, $email, $handle, $subject, $body, $subs)
 /*
-	Send email to person with $userid and/or $email and/or $handle (null/invalid values
-	are ignored or retrieved from user database as appropriate). Email uses $subject
-	and $body, after substituting each key in $subs with its corresponding value, plus
-	applying some standard substitutions such as ^site_title, ^handle and ^email.
+	Send email to person with $userid and/or $email and/or $handle (null/invalid values are ignored or retrieved from
+	user database as appropriate). Email uses $subject and $body, after substituting each key in $subs with its
+	corresponding value, plus applying some standard substitutions such as ^site_title, ^handle and ^email.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		global $qa_notifications_suspended;
 		
 		if ($qa_notifications_suspended>0)
 			return false;
 		
 		require_once QA_INCLUDE_DIR.'qa-db-selects.php';
-		require_once QA_INCLUDE_DIR.'qa-util-emailer.php';
 		require_once QA_INCLUDE_DIR.'qa-util-string.php';
 		
 		if (isset($userid)) {
@@ -106,7 +102,7 @@
 				'toemail' => $email,
 				'toname' => $handle,
 				'subject' => strtr($subject, $subs),
-				'body' => (empty($handle) ? '' : $handle.",\n\n").strtr($body, $subs),
+				'body' => (empty($handle) ? '' : qa_lang_sub('emails/to_handle_prefix', $handle)).strtr($body, $subs),
 				'html' => false,
 			));
 		
@@ -114,6 +110,48 @@
 			return false;
 	}
 	
+
+	function qa_send_email($params)
+/*
+	Send the email based on the $params array - the following keys are required (some can be empty): fromemail,
+	fromname, toemail, toname, subject, body, html
+*/
+	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
+		require_once QA_INCLUDE_DIR.'qa-class.phpmailer.php';
+		
+		$mailer=new PHPMailer();
+		$mailer->CharSet='utf-8';
+		
+		$mailer->From=$params['fromemail'];
+		$mailer->Sender=$params['fromemail'];
+		$mailer->FromName=$params['fromname'];
+		$mailer->AddAddress($params['toemail'], $params['toname']);
+		$mailer->Subject=$params['subject'];
+		$mailer->Body=$params['body'];
+
+		if ($params['html'])
+			$mailer->IsHTML(true);
+			
+		if (qa_opt('smtp_active')) {
+			$mailer->IsSMTP();
+			$mailer->Host=qa_opt('smtp_address');
+			$mailer->Port=qa_opt('smtp_port');
+			
+			if (qa_opt('smtp_secure'))
+				$mailer->SMTPSecure=qa_opt('smtp_secure');
+				
+			if (qa_opt('smtp_authenticate')) {
+				$mailer->SMTPAuth=true;
+				$mailer->Username=qa_opt('smtp_username');
+				$mailer->Password=qa_opt('smtp_password');
+			}
+		}
+			
+		return $mailer->Send();
+	}
+
 
 /*
 	Omit PHP closing tag to help avoid accidental output

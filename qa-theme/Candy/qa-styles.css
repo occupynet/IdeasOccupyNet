@@ -1,12 +1,11 @@
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-theme/Candy/qa-styles.css
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: CSS file for included Candy theme
 
 
@@ -23,6 +22,15 @@
 	More about this license: http://www.question2answer.org/license.php
 */
 
+/*
+	Theme URI: 
+	Theme Version: 1.5
+	Theme Date: 2011-12-14
+	Theme Author: Question2Answer
+	Theme Author URI: http://www.question2answer.org/
+	Theme License: GPLv2
+*/
+
 
 /* General page layout */
 
@@ -34,6 +42,8 @@ a:hover {text-decoration:underline;}
 input {outline:none;}
 p {margin-top:0;}
 
+.qa-notice {background:#ebc5e2 url(suggest-bg.png) repeat-x left bottom; border-bottom:1px solid #597700; color:#5c0045; font-size:14px; padding:12px 32px; font-weight:bold; position:relative;}
+.qa-notice-close-button, .qa-notice-close-hover {font-family:"Arial Black"; color:#5c0045; font-size:18px; background:none; cursor:pointer; position:absolute; height:24px; border:none; top:4px; right:6px}
 .qa-body-wrapper {background:#fff; border:1px solid #597700; width:980px; margin:0 auto; margin-top:-1px; text-align:left;}
 
 /* Clearing classes */
@@ -51,6 +61,14 @@ p {margin-top:0;}
 
 h1 {margin:1em 0 0.5em 0; color:#c659ab; font-size:28px; font-weight:bold;}
 h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
+
+.qa-favoriting {float:right; padding-right:16px;}
+
+.qa-favorite-button,.qa-favorite-hover,.qa-unfavorite-button,.qa-unfavorite-hover {background:url(favorite-heart.png) no-repeat; border:0; height:49px; width:50px;}
+	.qa-favorite-button {background-position: 0 -49px;}
+	.qa-favorite-hover,.qa-favorite-button:hover {background-position: 0 0px;}
+	.qa-unfavorite-button {background-position: 0 -98px;}
+	.qa-unfavorite-hover,.qa-unfavorite-button:hover {background-position: 0 0px;}
 
 .qa-error {background:#fed8d8 url(error-bg.png) repeat-x left top; border:2px solid #cc0000; color:#cc0000; font-size:18px; padding:.5em; margin:1em 0; }
 	.qa-error a {color:#900; text-decoration:underline;}
@@ -75,14 +93,14 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-widgets-main-high {margin-bottom:24px;}
 .qa-widget-main {margin:16px 0; width:748px;}
 .qa-widget-main-bottom {margin-bottom:0px;}
-.qa-widget-side {margin:16px 0; width:160px;}
+.qa-widget-side {margin:24px 0; width:160px;}
 
 /* Header sections */
 
 .qa-logo {float:left; margin-bottom:16px; padding-left:20px; padding-top:10px; font-size:48px; font-weight:bold; color:#6a1b56;}
 .qa-logo-link, .qa-logo-link:hover {color:#6a1b56;}
 
-.qa-search {float:right; background:#efecb2; border:2px solid #c0b600; margin-top:-2px; padding:10px; margin-right:10px; white-space:nowrap;}
+.qa-search {float:right; background:#efecb2; border:2px solid #c0b600; border-top:0; padding:10px; margin-right:10px; white-space:nowrap;}
 * html .qa-search {margin-right:6px;} /* IE6 */
 .qa-search form {margin:0;} /* IE6/7 */
 .qa-search-field {width:12em; margin-right:2px;}
@@ -149,6 +167,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-form-tall-checkbox {float:left; margin-right:4px;}
 .qa-form-tall-image {text-align:center; margin-top:12px;}
 	.qa-form-tall-image img {border:1px solid #000;}
+.qa-form-tall-suffix {font-weight:normal; font-size:10px; color:#666;}
 .qa-form-tall-error {color:#c00; font-size:14px; margin-top:6px; display:inline-block;}
 .qa-form-tall-note {margin-top:6px;}
 	.qa-form-tall-note a {color:#293D39; text-decoration:underline;}
@@ -168,7 +187,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-form-wide-text {width:320px; border:1px solid #999;}
 .qa-form-wide-number {width:48px; border:1px solid #999; vertical-align:middle;}
 .qa-form-wide-error {display:inline-block; color:#c00; font-size:11px; margin-left:6px;}
-.qa-form-wide-note {font-size:10px; margin-left:4px; color:#999;}
+.qa-form-wide-note {font-size:10px; margin-left:4px; color:#666;}
 .qa-form-wide-buttons {background:#FFF; padding:12px 0 8px 0;}
 .qa-form-wide-prefix {font-size:14px;}
 .qa-form-wide-button {background:#f6f5f5 url(button-bg.png) repeat-x left top; border:1px solid #bfbfbf; color:#206b00; padding:4px 8px; text-transform:uppercase;}
@@ -180,7 +199,8 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 	.qa-form-light-button {color:#666;}
 	.qa-form-light-hover, .qa-form-light-button:hover {color:#000;}
 
-.qa-form-light-button-edit,.qa-form-light-hover-edit {background:url(edit-icon.png) no-repeat left center; padding-left:24px;}
+.qa-form-light-button-edit,.qa-form-light-hover-edit,.qa-form-light-button-retagcat,.qa-form-light-hover-retagcat
+	{background:url(edit-icon.png) no-repeat left center; padding-left:24px;}
 .qa-form-light-button-flag,.qa-form-light-hover-flag {background:url(flag-icon.png) no-repeat left center; padding-left:24px;}
 .qa-form-light-button-unflag,.qa-form-light-hover-unflag,.qa-form-light-button-clearflags,.qa-form-light-hover-clearflags
 	{background:url(unflag-icon.png) no-repeat left center; padding-left:24px;}
@@ -191,6 +211,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-form-light-button-reshow,.qa-form-light-hover-reshow {background:url(reshow-icon.png) no-repeat left center; padding-left:24px;}
 .qa-form-light-button-claim,.qa-form-light-hover-claim {background:url(claim-icon.png) no-repeat left center; padding-left:22px;}
 .qa-form-light-button-delete,.qa-form-light-hover-delete {background:url(delete-icon.png) no-repeat left center; padding-left:24px;}
+.qa-form-light-button-approve,.qa-form-light-hover-approve {background:url(approve-icon.png) no-repeat left center; padding-left:24px;}
+.qa-form-light-button-reject,.qa-form-light-hover-reject {background:url(reject-icon.png) no-repeat left center; padding-left:24px;}
+.qa-form-light-button-close,.qa-form-light-hover-close {background:url(close-icon.png) no-repeat left center; padding-left:24px;}
+.qa-form-light-button-reopen,.qa-form-light-hover-reopen {background:url(reopen-icon.png) no-repeat left center; padding-left:24px;}
 
 /* Standard form (basic version - buttons only) */
 
@@ -207,14 +231,17 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-q-item-main {width:500px; float:left; padding-left:10px;}
 .qa-q-item-title {color:#000; font-size:20px;}
 	.qa-q-item-title a {color:#000;}
+.qa-q-item-content {font-size:10px; margin-top:8px; max-height:80px; overflow-y:auto; padding:4px; border:1px solid #ccc;}
 .qa-q-item-avatar {display:inline-block; vertical-align:middle; margin-top:8px; margin-right:2px;}
 .qa-q-item-meta {display:inline-block; vertical-align:middle; margin-top:8px; font-size:14px;}
 .qa-q-item-when-data {font-weight:bold;}
 .qa-q-item-who-title {font-size:80%; font-weight:bold; color:#6b0000;}
 .qa-q-item-points-data {font-weight:bold;}
+.qa-q-item-flags {color:#f00; font-weight:bold; padding-left:4px;}
 .qa-q-item-tags {margin-top:12px;}
 .qa-q-item-tag-list {list-style:none; margin:0; padding:0;}
 .qa-q-item-tag-item {display:inline;}
+.qa-q-item-buttons {text-align:right;}
 
 .qa-suggest-next {background:#ebc5e2 url(suggest-bg.png) repeat-x left bottom; border:1px solid #6a1b56; color:#c659ab; font-size:14px; padding:8px; text-align:center; clear:both;}
 	.qa-suggest-next a {color:#5c0045; font-style:italic; text-decoration:underline;}
@@ -268,7 +295,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-a-count-data {font-size:28px; font-weight:bold;}
 .qa-a-count-pad {font-size:14px;}
 
-.qa-view-count {float:right; font-size:11px; color: #9560F0; margin:6px 0 0 20px;}
+.qa-view-count {float:right; font-size:11px; color: #9560F0; margin:6px 8px 0 20px;}
 .qa-view-count-data {font-weight:bold;}
 
 /* Tags, users and categories */
@@ -304,6 +331,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-q-view-avatar {display:inline-block; vertical-align:middle; margin-right:8px;}
 .qa-q-view-meta {display:inline-block; vertical-align:middle; font-size:12px;}
 .qa-q-view-follows {font-size:14px; margin-bottom:12px;}
+.qa-q-view-closed {font-size:14px; margin-bottom:18px;}
+.qa-q-view-closed-content {font-weight:bold;}
+.qa-q-view-extra {font-size:14px; margin-bottom:18px;}
+.qa-q-view-extra-content {font-weight:bold;}
 .qa-q-view-when-data {font-weight:bold;}
 .qa-q-view-who-title {font-size:80%; font-weight:bold; color:#6b0000;}
 .qa-q-view-points-data {font-weight:bold;}
@@ -373,6 +404,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 	.qa-c-item-hidden .qa-user-link {color:#999;}
 
 .qa-c-item-link {display:block; margin-bottom:6px;}
+.qa-c-item-expand {display:block; color:#666; font-style:italic; margin:2px 0;}
 .qa-c-item-content {display:block; color:#333; margin-bottom:6px;}
 .qa-c-item-footer {position:relative; height:1%;} /* height for IE6 */
 .qa-c-item-avatar {display:inline-block; vertical-align:middle; margin-right:4px;}
@@ -383,6 +415,16 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-c-item-buttons {display:block; position:absolute; bottom:0px; right:0px;}
 
 .qa-c-item-buttons .qa-form-light-button,.qa-c-item-buttons .qa-form-light-hover {background:none; height:auto; font-size:10px; padding:0;}
+
+/* Related questions and activity count widgets */
+
+.qa-related-qs {font-size:14px;}
+.qa-related-qs h2 {font-size:18px;}
+.qa-related-q-list {list-style-type:none; padding:0;}
+.qa-related-q-item {margin:0.5em 0;}
+.qa-activity-count {font-size:14px;}
+.qa-activity-count-item {margin:0.5em 0;}
+.qa-activity-count-data {font-size:24px; font-weight:bold;}
 
 /* Footer parts */
 
@@ -402,9 +444,14 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 	.qa-tag-link:hover {text-decoration:underline !important;}
 .qa-avatar-image {border:0; vertical-align:middle;}
 .qa-avatar-link,.qa-avatar-link:hover {text-decoration:none;}
+.qa-favorite-image {background:url(favorite-heart.png) no-repeat; background-position: 0 0px; border:0; height:49px; width:50px; vertical-align:middle; display:inline-block;}
 
 /* IE6 friendly versions of icons with binary alpha channel */
-* html .qa-form-light-button-edit,* html .qa-form-light-hover-edit {background:url(edit-icon-ie6.png) no-repeat left center;}
+* html .qa-favorite-button {background:url(favorite-heart-ie6.png) no-repeat 0 -49px;}
+* html .qa-favorite-hover,* html .qa-unfavorite-hover {background:url(favorite-heart-ie6.png) no-repeat 0 0px;}
+* html .qa-unfavorite-button {background:url(favorite-heart-ie6.png) no-repeat 0 -98px;}
+* html .qa-form-light-button-edit,* html .qa-form-light-hover-edit,* html .qa-form-light-button-retagcat,* html .qa-form-light-hover-retagcat
+	{background:url(edit-icon-ie6.png) no-repeat left center;}
 * html .qa-form-light-button-flag,* html .qa-form-light-hover-flag {background:url(flag-icon-ie6.png) no-repeat left center;}
 * html .qa-form-light-button-unflag,* html .qa-form-light-hover-unflag,* html .qa-form-light-button-clearflags,* html .qa-form-light-hover-clearflags
 	{background:url(unflag-icon-ie6.png) no-repeat left center;}
@@ -415,6 +462,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 * html .qa-form-light-button-reshow,* html .qa-form-light-hover-reshow {background:url(reshow-icon-ie6.png) no-repeat left center;}
 * html .qa-form-light-button-claim,* html .qa-form-light-hover-claim {background:url(claim-icon-ie6.png) no-repeat left center;}
 * html .qa-form-light-button-delete,* html .qa-form-light-hover-delete {background:url(delete-icon-ie6.png) no-repeat left center;}
+* html .qa-form-light-button-approve,* html .qa-form-light-hover-approve {background:url(approve-icon-ie6.png) no-repeat left center;}
+* html .qa-form-light-button-reject,* html .qa-form-light-hover-reject {background:url(reject-icon-ie6.png) no-repeat left center;}
+* html .qa-form-light-button-close,* html .qa-form-light-hover-close {background:url(close-icon-ie6.png) no-repeat left center;}
+* html .qa-form-light-button-reopen,* html .qa-form-light-hover-reopen {background:url(reopen-icon-ie6.png) no-repeat left center;}
 * html .qa-vote-up-button {background:url(vote-buttons-ie6.png) no-repeat 0 0;}
 * html .qa-vote-up-hover {background:url(vote-buttons-ie6.png) no-repeat 0 -29px;}
 * html .qa-vote-up-disabled {background:url(vote-buttons-ie6.png) no-repeat 0 -116px;}
@@ -427,3 +478,4 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 * html .qa-voted-down-hover {background:url(vote-buttons-ie6.png) no-repeat -27px -29px;}
 * html .qa-tag-link {background:url(tag-icon-ie6.png) no-repeat left center;}
 * html .qa-a-count {background:url(a-count-icon-ie6.png) no-repeat 32px 13px;}
+* html .qa-favorite-image {background:url(favorite-heart-ie6.png) no-repeat 0 0px;}

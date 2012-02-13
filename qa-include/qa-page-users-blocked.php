@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-users-blocked.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for page showing users who have been blocked
 
 
@@ -48,7 +47,7 @@
 
 //	Check we have permission to view this page (moderator or above)
 
-	if ( (!isset($qa_login_userid)) || (qa_get_logged_in_level()<QA_USER_LEVEL_MODERATOR) ) {
+	if (qa_get_logged_in_level() < QA_USER_LEVEL_MODERATOR) {
 		$qa_content=qa_content_prepare();
 		$qa_content['error']=qa_lang_html('users/no_permission');
 		return $qa_content;
@@ -66,7 +65,11 @@
 
 	$qa_content['title']=count($users) ? qa_lang_html('users/blocked_users') : qa_lang_html('users/no_blocked_users');
 	
-	$qa_content['ranking']=array('items' => array(), 'rows' => ceil(qa_opt('page_size_users')/qa_opt('columns_users')), 'type' => 'users');
+	$qa_content['ranking']=array(
+		'items' => array(),
+		'rows' => ceil(qa_opt('page_size_users')/qa_opt('columns_users')),
+		'type' => 'users'
+	);
 	
 	foreach ($users as $user) {
 		$qa_content['ranking']['items'][]=array(

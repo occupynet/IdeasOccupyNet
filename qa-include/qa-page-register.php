@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-register.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for register page
 
 
@@ -39,7 +38,7 @@
 	if (QA_FINAL_EXTERNAL_USERS)
 		qa_fatal_error('User registration is handled by external code');
 		
-	if (isset($qa_login_userid))
+	if (qa_is_logged_in())
 		qa_redirect('');
 	
 	if (qa_opt('suspend_register_users')) {
@@ -58,31 +57,39 @@
 //	Process submitted form
 
 	if (qa_clicked('doregister')) {
-		require_once QA_INCLUDE_DIR.'qa-app-users-edit.php';
+		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
-		$inemail=qa_post_text('email');
-		$inpassword=qa_post_text('password');
-		$inhandle=qa_post_text('handle');
-		
-		$errors=array_merge(
-			qa_handle_email_validate($inhandle, $inemail),
-			qa_password_validate($inpassword)
-		);
-		
-		if (qa_opt('captcha_on_register'))
-			qa_captcha_validate($_POST, $errors);
-	
-		if (empty($errors)) { // register and redirect
-			$userid=qa_create_new_user($inemail, $inpassword, $inhandle);
-			qa_set_logged_in_user($userid, $inhandle);
-
-			$topath=qa_get('to');
+		if (qa_limits_remaining(null, QA_LIMIT_REGISTRATIONS)) {
+			require_once QA_INCLUDE_DIR.'qa-app-users-edit.php';
 			
-			if (isset($topath))
-				qa_redirect_raw($qa_root_url_relative.$topath); // path already provided as URL fragment
-			else
-				qa_redirect('');
-		}
+			$inemail=qa_post_text('email');
+			$inpassword=qa_post_text('password');
+			$inhandle=qa_post_text('handle');
+			
+			$errors=array_merge(
+				qa_handle_email_filter($inhandle, $inemail),
+				qa_password_validate($inpassword)
+			);
+			
+			if (qa_opt('captcha_on_register'))
+				qa_captcha_validate_post($errors);
+		
+			if (empty($errors)) { // register and redirect
+				qa_limits_increment(null, QA_LIMIT_REGISTRATIONS);
+
+				$userid=qa_create_new_user($inemail, $inpassword, $inhandle);
+				qa_set_logged_in_user($userid, $inhandle);
+	
+				$topath=qa_get('to');
+				
+				if (isset($topath))
+					qa_redirect_raw(qa_path_to_root().$topath); // path already provided as URL fragment
+				else
+					qa_redirect('');
+			}
+			
+		} else
+			$pageerror=qa_lang('users/register_limit');
 	}
 
 
@@ -91,13 +98,22 @@
 	$qa_content=qa_content_prepare();
 
 	$qa_content['title']=qa_lang_html('users/register_title');
+	
+	$qa_content['error']=@$pageerror;
 
+	$custom=qa_opt('show_custom_register') ? trim(qa_opt('custom_register')) : '';
+	
 	$qa_content['form']=array(
 		'tags' => 'METHOD="POST" ACTION="'.qa_self_html().'"',
 		
 		'style' => 'tall',
 		
 		'fields' => array(
+			'custom' => array(
+				'type' => 'custom',
+				'note' => $custom,
+			),
+			
 			'handle' => array(
 				'label' => qa_lang_html('users/handle_label'),
 				'tags' => 'NAME="handle" ID="handle"',
@@ -133,22 +149,21 @@
 		),
 	);
 	
+	if (!strlen($custom))
+		unset($qa_content['form']['fields']['custom']);
+	
 	if (qa_opt('captcha_on_register'))
 		qa_set_up_captcha_field($qa_content, $qa_content['form']['fields'], @$errors);
 	
-	$modulenames=qa_list_modules('login');
+	$loginmodules=qa_load_modules_with('login', 'login_html');
 	
-	foreach ($modulenames as $tryname) {
-		$module=qa_load_module('login', $tryname);
+	foreach ($loginmodules as $module) {
+		ob_start();
+		$module->login_html(qa_opt('site_url').qa_get('to'), 'register');
+		$html=ob_get_clean();
 		
-		if (method_exists($module, 'login_html')) {
-			ob_start();
-			$module->login_html(qa_opt('site_url').qa_get('to'), 'register');
-			$html=ob_get_clean();
-			
-			if (strlen($html))
-				@$qa_content['custom'].='<BR>'.$html.'<BR>';
-		}
+		if (strlen($html))
+			@$qa_content['custom'].='<BR>'.$html.'<BR>';
 	}
 
 	$qa_content['focusid']=isset($errors['handle']) ? 'handle'

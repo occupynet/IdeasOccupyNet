@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-ajax-vote.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Server-side response to Ajax voting requests
 
 
@@ -33,40 +32,32 @@
 	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 	
 
-	function qa_ajax_vote_db_fail_handler()
-	{
-		echo "QA_AJAX_RESPONSE\n0\nA database error occurred.";
-		exit;
-	}
-
-	qa_base_db_connect('qa_ajax_vote_db_fail_handler');
-
 	$postid=qa_post_text('postid');
-	$qa_login_userid=qa_get_logged_in_userid();
-	$qa_cookieid=qa_cookie_get();
+	$vote=qa_post_text('vote');
+	
+	$userid=qa_get_logged_in_userid();
+	$cookieid=qa_cookie_get();
 
-	$post=qa_db_select_with_pending(qa_db_full_post_selectspec($qa_login_userid, $postid));
+	$post=qa_db_select_with_pending(qa_db_full_post_selectspec($userid, $postid));
 
-	$voteerror=qa_vote_error_html($post, $qa_login_userid, $qa_request);
+	$voteerror=qa_vote_error_html($post, $vote, $userid, qa_request());
 	
 	if ($voteerror===false) {
-		qa_vote_set($post, $qa_login_userid, qa_get_logged_in_handle(), $qa_cookieid, qa_post_text('vote'));
+		qa_vote_set($post, $userid, qa_get_logged_in_handle(), $cookieid, $vote);
 		
-		$post=qa_db_select_with_pending(qa_db_full_post_selectspec($qa_login_userid, $postid));
+		$post=qa_db_select_with_pending(qa_db_full_post_selectspec($userid, $postid));
 		
-		$fields=qa_post_html_fields($post, $qa_login_userid, $qa_cookieid, array(), null, array(
-			'voteview' => qa_opt('votes_separated') ? 'updown' : 'net')
-		);
+		$fields=qa_post_html_fields($post, $userid, $cookieid, array(), null, array(
+			'voteview' => qa_get_vote_view($post['basetype'], true), // behave as if on question page since the vote succeeded
+		));
 		
-		$themeclass=qa_load_theme_class(qa_opt('site_theme'), 'voting', null, null);
+		$themeclass=qa_load_theme_class(qa_get_site_theme(), 'voting', null, null);
 
 		echo "QA_AJAX_RESPONSE\n1\n";
 		$themeclass->voting_inner_html($fields);
 
 	} else
 		echo "QA_AJAX_RESPONSE\n0\n".$voteerror;
-
-	qa_base_db_disconnect();
 	
 
 /*

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-points.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database-level access to user points and statistics
 
 
@@ -36,9 +35,11 @@
 	Returns an array of option names required to perform calculations in userpoints table
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		return array(
-			'points_post_q', 'points_select_a', 'points_per_q_voted', 'points_q_voted_max_gain', 'points_q_voted_max_loss',
-			'points_post_a', 'points_a_selected', 'points_per_a_voted', 'points_a_voted_max_gain', 'points_a_voted_max_loss',
+			'points_post_q', 'points_select_a', 'points_per_q_voted_up', 'points_per_q_voted_down', 'points_q_voted_max_gain', 'points_q_voted_max_loss',
+			'points_post_a', 'points_a_selected', 'points_per_a_voted_up', 'points_per_a_voted_down', 'points_a_voted_max_gain', 'points_a_voted_max_loss',
 			'points_vote_up_q', 'points_vote_down_q', 'points_vote_up_a', 'points_vote_down_a',
 			
 			'points_multiple', 'points_base',
@@ -55,6 +56,8 @@
 	The element 'multiple' specifies what to multiply each column by to create the final sum in the points column.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		
 		$options=qa_get_options(qa_db_points_option_names());
@@ -87,40 +90,40 @@
 			
 			'qupvotes' => array(
 				'multiple' => $options['points_multiple']*$options['points_vote_up_q'],
-				'formula' => "COUNT(*) AS qupvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND (^posts.type='Q' OR ^posts.type='Q_HIDDEN') AND userid_src.vote>0",
+				'formula' => "COUNT(*) AS qupvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND LEFT(^posts.type, 1)='Q' AND userid_src.vote>0",
 			),
 			
 			'qdownvotes' => array(
 				'multiple' => $options['points_multiple']*$options['points_vote_down_q'],
-				'formula' => "COUNT(*) AS qdownvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND (^posts.type='Q' OR ^posts.type='Q_HIDDEN') AND userid_src.vote<0",
+				'formula' => "COUNT(*) AS qdownvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND LEFT(^posts.type, 1)='Q' AND userid_src.vote<0",
 			),
 			
 			'aupvotes' => array(
 				'multiple' => $options['points_multiple']*$options['points_vote_up_a'],
-				'formula' => "COUNT(*) AS aupvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND (^posts.type='A' OR ^posts.type='A_HIDDEN') AND userid_src.vote>0",
+				'formula' => "COUNT(*) AS aupvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND LEFT(^posts.type, 1)='A' AND userid_src.vote>0",
 			),
 			
 			'adownvotes' => array(
 				'multiple' => $options['points_multiple']*$options['points_vote_down_a'],
-				'formula' => "COUNT(*) AS adownvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND (^posts.type='A' OR ^posts.type='A_HIDDEN') AND userid_src.vote<0",
+				'formula' => "COUNT(*) AS adownvotes FROM ^uservotes AS userid_src JOIN ^posts ON userid_src.postid=^posts.postid WHERE userid_src.userid~ AND LEFT(^posts.type, 1)='A' AND userid_src.vote<0",
 			),
 			
 			'qvoteds' => array(
 				'multiple' => $options['points_multiple'],
 				'formula' => "COALESCE(SUM(".
-					"LEAST(".((int)$options['points_per_q_voted'])."*upvotes,".((int)$options['points_q_voted_max_gain']).")".
+					"LEAST(".((int)$options['points_per_q_voted_up'])."*upvotes,".((int)$options['points_q_voted_max_gain']).")".
 					"-".
-					"LEAST(".((int)$options['points_per_q_voted'])."*downvotes,".((int)$options['points_q_voted_max_loss']).")".
-					"), 0) AS qvoteds FROM ^posts AS userid_src WHERE (type='Q' OR type='Q_HIDDEN') AND userid~",
+					"LEAST(".((int)$options['points_per_q_voted_down'])."*downvotes,".((int)$options['points_q_voted_max_loss']).")".
+					"), 0) AS qvoteds FROM ^posts AS userid_src WHERE LEFT(type, 1)='Q' AND userid~",
 			),
 			
 			'avoteds' => array(
 				'multiple' => $options['points_multiple'],
 				'formula' => "COALESCE(SUM(".
-					"LEAST(".((int)$options['points_per_a_voted'])."*upvotes,".((int)$options['points_a_voted_max_gain']).")".
+					"LEAST(".((int)$options['points_per_a_voted_up'])."*upvotes,".((int)$options['points_a_voted_max_gain']).")".
 					"-".
-					"LEAST(".((int)$options['points_per_a_voted'])."*downvotes,".((int)$options['points_a_voted_max_loss']).")".
-					"), 0) AS avoteds FROM ^posts AS userid_src WHERE (type='A' OR type='A_HIDDEN') AND userid~",
+					"LEAST(".((int)$options['points_per_a_voted_down'])."*downvotes,".((int)$options['points_a_voted_max_loss']).")".
+					"), 0) AS avoteds FROM ^posts AS userid_src WHERE LEFT(type, 1)='A' AND userid~",
 			),
 			
 			'upvoteds' => array(
@@ -143,6 +146,8 @@
 	This dynamically builds some fairly crazy looking SQL, but it works, and saves repeat calculations.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		if (qa_should_update_counts() && isset($userid)) {
 			require_once QA_INCLUDE_DIR.'qa-app-options.php';
 
@@ -171,16 +176,17 @@
 					$insertfields.=$field.', ';
 					$insertvalues.='@_'.$field.':=(SELECT '.$calculation['formula'].'), ';
 					$updates.=$field.'=@_'.$field.', ';
-					$insertpoints.='+('.$multiple.'*@_'.$field.')';
+					$insertpoints.='+('.(int)$multiple.'*@_'.$field.')';
 				}
 				
 				$updatepoints.='+('.$multiple.'*'.(isset($keycolumns[$field]) ? '@_' : '').$field.')';
 			}
 			
 			$query='INSERT INTO ^userpoints ('.$insertfields.'points) VALUES ('.$insertvalues.$insertpoints.') '.
-				'ON DUPLICATE KEY UPDATE '.$updates.'points='.$updatepoints;
+				'ON DUPLICATE KEY UPDATE '.$updates.'points='.$updatepoints.'+bonus';
 			
-			qa_db_query_sub(str_replace('~', "=_utf8 '".qa_db_escape_string($userid)."'", $query), $userid);
+			qa_db_query_raw(str_replace('~', "='".qa_db_escape_string($userid)."'", qa_db_apply_sub($query, array($userid))));
+				// build like this so that a #, $ or ^ character in the $userid (if external integration) isn't substituted
 			
 			if (qa_db_insert_on_duplicate_inserted())
 				qa_db_userpointscount_update();
@@ -188,6 +194,18 @@
 	}
 
 
+	function qa_db_points_set_bonus($userid, $bonus)
+/*
+	Set the number of explicit bonus points for $userid to $bonus
+*/
+	{
+		qa_db_query_sub(
+			"INSERT INTO ^userpoints (userid, bonus) VALUES ($, #) ON DUPLICATE KEY UPDATE bonus=#",
+			$userid, $bonus, $bonus
+		);
+	}
+	
+	
 	function qa_db_userpointscount_update()
 /*
 	Update the cached count in the database of the number of rows in the userpoints table

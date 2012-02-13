@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/example-page/qa-example-page.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Page module class for example page plugin
 
 
@@ -30,11 +29,13 @@
 		var $directory;
 		var $urltoroot;
 		
+
 		function load_module($directory, $urltoroot)
 		{
 			$this->directory=$directory;
 			$this->urltoroot=$urltoroot;
 		}
+
 		
 		function suggest_requests() // for display in admin interface
 		{	
@@ -46,6 +47,7 @@
 				),
 			);
 		}
+
 		
 		function match_request($request)
 		{
@@ -54,12 +56,13 @@
 
 			return false;
 		}
+
 		
 		function process_request($request)
 		{
 			$qa_content=qa_content_prepare();
 
-			$qa_content['title']='Example plugin page';
+			$qa_content['title']=qa_lang_html('example_page/page_title');
 			$qa_content['error']='An example error';
 			$qa_content['custom']='Some <B>custom html</B>';
 
@@ -100,7 +103,7 @@
 			return $qa_content;
 		}
 	
-	};
+	}
 	
 
 /*

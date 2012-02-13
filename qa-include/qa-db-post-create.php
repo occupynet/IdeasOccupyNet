@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-db-post-create.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Database functions for creating a question, answer or comment
 
 
@@ -78,12 +77,12 @@
 	
 	function qa_db_post_acount_update($questionid)
 /*
-	Update the cached number of answers for $questionid in the database
+	Update the cached number of answers for $questionid in the database, along with the highest netvotes of any of its answers
 */
 	{
 		if (qa_should_update_counts())
 			qa_db_query_sub(
-				'UPDATE ^posts AS x, (SELECT COUNT(*) AS acount FROM ^posts WHERE parentid=# AND type=\'A\') AS a SET x.acount=a.acount WHERE x.postid=#',
+				"UPDATE ^posts AS x, (SELECT COUNT(*) AS acount, COALESCE(GREATEST(MAX(netvotes), 0), 0) AS amaxvote FROM ^posts WHERE parentid=# AND type='A') AS a SET x.acount=a.acount, x.amaxvote=a.amaxvote WHERE x.postid=#",
 				$questionid, $questionid
 			);
 	}
@@ -193,7 +192,7 @@
 	{
 		if (count($words))
 			return qa_db_read_all_assoc(qa_db_query_sub(
-				'SELECT wordid, BINARY word AS word FROM ^words WHERE word IN ($)', $words
+				'SELECT wordid, word FROM ^words WHERE word IN ($)', $words
 			), 'word', 'wordid');
 		else
 			return array();
@@ -287,7 +286,7 @@
 	
 	function qa_db_qcount_update()
 /*
-	Updated the cached count in the database of the number of questions (excluding hidden)
+	Update the cached count in the database of the number of questions (excluding hidden/queued)
 */
 	{
 		if (qa_should_update_counts())
@@ -297,7 +296,7 @@
 
 	function qa_db_acount_update()
 /*
-	Updated the cached count in the database of the number of answers (excluding hidden)
+	Update the cached count in the database of the number of answers (excluding hidden/queued)
 */
 	{
 		if (qa_should_update_counts())
@@ -307,7 +306,7 @@
 
 	function qa_db_ccount_update()
 /*
-	Updated the cached count in the database of the number of comments (excluding hidden)
+	Update the cached count in the database of the number of comments (excluding hidden/queued)
 */
 	{
 		if (qa_should_update_counts())
@@ -317,7 +316,7 @@
 
 	function qa_db_tagcount_update()
 /*
-	Updated the cached count in the database of the number of different tags used
+	Update the cached count in the database of the number of different tags used
 */
 	{
 		if (qa_should_update_counts())
@@ -327,13 +326,32 @@
 	
 	function qa_db_unaqcount_update()
 /*
-	Updated the cached count in the database of the number of unanswered questions (excluding hidden)
+	Update the cached count in the database of the number of unanswered questions (excluding hidden/queued)
 */
 	{
 		if (qa_should_update_counts())
 			qa_db_query_sub("REPLACE ^options (title, content) SELECT 'cache_unaqcount', COUNT(*) FROM ^posts WHERE type='Q' AND acount=0");
 	}
 	
+	
+	function qa_db_unselqcount_update()
+/*
+	Update the cached count in the database of the number of questions with no answer selected (excluding hidden/queued)
+*/
+	{
+		if (qa_should_update_counts())
+			qa_db_query_sub("REPLACE ^options (title, content) SELECT 'cache_unselqcount', COUNT(*) FROM ^posts WHERE type='Q' AND selchildid IS NULL");
+	}
+	
+	
+	function qa_db_unupaqcount_update()
+/*
+	Update the cached count in the database of the number of questions with no upvoted answers (excluding hidden/queued)
+*/
+	{
+		if (qa_should_update_counts())
+			qa_db_query_sub("REPLACE ^options (title, content) SELECT 'cache_unupaqcount', COUNT(*) FROM ^posts WHERE type='Q' AND amaxvote=0");
+	}
 
 /*
 	Omit PHP closing tag to help avoid accidental output

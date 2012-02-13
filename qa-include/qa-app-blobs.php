@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-blobs.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Application-level blob-management functions
 
 
@@ -36,6 +35,8 @@
 	Return the URL which will output $blobid from the database when requested, $absolute or relative
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		return qa_path('blob', array('qa_blobid' => $blobid), $absolute ? qa_opt('site_url') : null, QA_URL_FORMAT_PARAMS);
 	}
 	
@@ -45,6 +46,8 @@
 	Return the maximum size of file that can be uploaded, based on database and PHP limits
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		$mindb=16777215; // from MEDIUMBLOB column type
 		
 		$minphp=trim(ini_get('upload_max_filesize'));
@@ -61,7 +64,6 @@
 		return min($mindb, $minphp);
 	}
 	
-
 
 /*
 	Omit PHP closing tag to help avoid accidental output

@@ -1,13 +1,12 @@
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-content/qa-ask.js
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: JS for ask page, for tag auto-completion
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Javascript for ask page and question editing, including tag auto-completion
 
 
 	This program is free software; you can redistribute it and/or
@@ -41,7 +40,7 @@ function qa_title_change(value)
 		} else if (lines[0]=='0')
 			alert(lines[1]);
 		else
-			alert('Unexpected response from server - please try again.');
+			qa_ajax_error();
 	});
 }
 
@@ -167,6 +166,7 @@ function qa_tag_typed_parts(elem)
 function qa_category_select(idprefix, startpath)
 {
 	var startval=startpath ? startpath.split("/") : [];
+	var setdescnow=true;
 	
 	for (var l=0; l<=qa_cat_maxdepth; l++) {
 		var elem=document.getElementById(idprefix+'_'+l);
@@ -184,7 +184,7 @@ function qa_category_select(idprefix, startpath)
 			} else
 				val='';
 			
-			if ((elem.qa_last_sel!==val) && (l<qa_cat_maxdepth)) {
+			if (elem.qa_last_sel!==val) {
 				elem.qa_last_sel=val;
 				
 				var subelem=document.getElementById(idprefix+'_'+l+'_sub');
@@ -196,7 +196,7 @@ function qa_category_select(idprefix, startpath)
 					subelem.id=idprefix+'_'+l+'_sub';
 					subelem.innerHTML=' ...';
 					
-					qa_ajax_post('subcats', {categoryid:val},
+					qa_ajax_post('category', {categoryid:val},
 						(function(elem, l) {
 							return function(lines) {
 								var subelem=document.getElementById(idprefix+'_'+l+'_sub');
@@ -204,7 +204,11 @@ function qa_category_select(idprefix, startpath)
 									subelem.parentNode.removeChild(subelem);
 								
 								if (lines[0]=='1') {
-									if (lines.length>1) {
+									elem.qa_cat_desc=lines[1];
+									
+									var addedoption=false;
+									
+									if (lines.length>2) {
 										var subelem=elem.parentNode.insertBefore(document.createElement('span'), elem.nextSibling);
 										subelem.id=idprefix+'_'+l+'_sub';
 										subelem.innerHTML=' ';
@@ -217,9 +221,7 @@ function qa_category_select(idprefix, startpath)
 										if (l ? qa_cat_allownosub : qa_cat_allownone)
 											newelem.options[0]=new Option(l ? '' : elem.options[0].text, '', true, true);
 										
-										var addedoption=false;
-										
-										for (var i=1; i<lines.length; i++) {
+										for (var i=2; i<lines.length; i++) {
 											var parts=lines[i].split('/');
 											
 											if (String(qa_cat_exclude).length && (String(qa_cat_exclude)==parts[0]))
@@ -232,39 +234,50 @@ function qa_category_select(idprefix, startpath)
 										if (addedoption) {
 											subelem.appendChild(newelem);
 											qa_category_select(idprefix, startpath);
+
 										}
 										
 										if (l==0)
 											elem.style.display='none';
 									}
+									
+									if (!addedoption)
+										set_category_description(idprefix);
 								
 								} else if (lines[0]=='0')
 									alert(lines[1]);
 								else
-									alert('Unexpected response from server - please try again.');
+									qa_ajax_error();
 							}
 						})(elem, l)
 					);
+					
+					setdescnow=false;
 				}
 				
 				break;
 			}
 		}
 	}
+	
+	if (setdescnow)
+		set_category_description(idprefix);
 }
 
-function qa_ajax_post(operation, params, callback)
+function set_category_description(idprefix)
 {
-	jQuery.extend(params, {qa:'ajax', qa_operation:operation, qa_root:qa_root, qa_request:qa_request});
+	var n=document.getElementById(idprefix+'_note');
 	
-	jQuery.post(qa_root, params, function(response) {
-		var header='QA_AJAX_RESPONSE';
-		var headerpos=response.indexOf(header);
+	if (n) {
+		desc='';
 		
-		if (headerpos>=0)
-			callback(response.substr(headerpos+header.length).replace(/^\s+/, '').split("\n"));
-		else
-			callback([]);
-
-	}, 'text').error(function(jqXHR) { if (jqXHR.readyState>0) callback([]) });
+		for (var l=1; l<=qa_cat_maxdepth; l++) {
+			var elem=document.getElementById(idprefix+'_'+l);
+			
+			if (elem && elem.options[elem.selectedIndex].value.length)
+				desc=elem.qa_cat_desc;
+		}
+		
+		n.innerHTML=desc;
+	}
 }

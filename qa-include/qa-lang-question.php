@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-lang-question.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Language phrases for question page
 
 
@@ -34,13 +33,17 @@
 		'a_notify_email' => 'Email me at this address if my answer is selected or commented on:',
 		'a_notify_label' => 'Email me if my answer is selected or commented on',
 		'a_notify_x_label' => 'Email me (^) if my answer is selected or commented on',
+		'a_waiting_your_approval' => 'This answer is waiting for your approval',
+		'a_your_waiting_approval' => 'Your answer will be checked and approved shortly.',
 		'add_answer_button' => 'Add answer',
 		'add_comment_button' => 'Add comment',
+		'add_q_favorites' => 'Add this question to my favorites',
 		'answer_button' => 'answer',
 		'answer_limit' => 'Too many answers received - please try again in an hour',
 		'answer_must_confirm' => 'Please ^5confirm your email address^6 to answer this question.',
 		'answer_must_login' => 'Please ^1log in^2 or ^3register^4 to answer this question.',
 		'answer_q_popup' => 'Answer this question',
+		'approve_button' => 'approve',
 		'ask_button' => 'Ask the Question',
 		'ask_follow_from_a' => 'Your question will be related to this answer:',
 		'ask_follow_title' => 'Ask a related question',
@@ -52,11 +55,24 @@
 		'c_notify_email' => 'Email me at this address if a comment is added after mine:',
 		'c_notify_label' => 'Email me if a comment is added after mine',
 		'c_notify_x_label' => 'Email me (^) if a comment is added after mine',
+		'c_waiting_your_approval' => 'This comment is waiting for your approval',
+		'c_your_waiting_approval' => 'Your comment will be checked and approved shortly.',
 		'category_js_note' => 'To select any category, please enable Javascript in your web browser.',
 		'category_required' => 'Please choose a category',
 		'claim_button' => 'I wrote this',
 		'clear_flags_button' => 'clear flags',
 		'clear_flags_popup' => 'Remove flags by all users',
+		'close_button' => 'close',
+		'close_duplicate_error' => 'The duplicate question could not be found - please try entering the number from a different question URL, e.g. 123.',
+		'close_duplicate' => 'This is a duplicate of another question',
+		'close_form_button' => 'Close question',
+		'close_form_title' => 'Close this question',
+		'close_original_note' => 'You can also enter the question number from the URL, e.g. 123.',
+		'close_original_title' => 'URL of the original question:',
+		'close_q_popup' => 'Close this question to any new answers',
+		'close_reason_title' => 'Reason for closing this question:',
+		'closed_as_duplicate' => 'closed as a duplicate of:',
+		'closed_with_note' => 'closed with the note:',
 		'comment_a_popup' => 'Add a comment on this answer',
 		'comment_button' => 'comment',
 		'comment_limit' => 'Too many comments received - please try again in an hour',
@@ -79,7 +95,6 @@
 		'edit_must_login' => 'Please ^1log in^2 or ^3register^4 to edit this.',
 		'edit_q_popup' => 'Edit this question',
 		'edit_q_title' => 'Edit Question',
-		'edited_x_ago' => 'edited ^ ago',
 		'example_tags' => 'Example tags: ',
 		'flag_a_popup' => 'Flag this answer as spam or inappropriate',
 		'flag_button' => 'flag',
@@ -94,8 +109,6 @@
 		'follow_button' => 'ask related question',
 		'follows_a' => 'related to an answer for:',
 		'follows_q' => 'about the question:',
-		'hidden_x_ago' => 'hidden ^ ago',
-		'hidden' => 'hidden',
 		'hide_a_popup' => 'Hide this answer',
 		'hide_button' => 'hide',
 		'hide_c_popup' => 'Hide this comment',
@@ -105,7 +118,7 @@
 		'min_tags_x' => 'Please provide at least ^ tag/s',
 		'notify_email_note' => 'Privacy: Your email address will only be used for sending these notifications.',
 		'q_category_label' => 'Category:',
-		'q_content_label' => 'More information for your question:',
+		'q_content_label' => 'More information for the question:',
 		'q_hidden_author' => 'This question has been hidden by its author',
 		'q_hidden_flagged' => 'This question has been flagged and hidden',
 		'q_hidden_other' => 'This question has been hidden',
@@ -114,12 +127,29 @@
 		'q_notify_x_label' => 'Email me (^) if my question is answered or commented on',
 		'q_tags_comma_label' => 'Tags - use comma (,) as a separator:',
 		'q_tags_label' => 'Tags - use hyphens to combine words:',
-		'q_title_label' => 'Your question in one sentence:',
+		'q_title_label' => 'The question in one sentence:',
+		'q_waiting_approval' => 'This question is waiting for approval',
+		'q_waiting_your_approval' => 'This question is waiting for your approval',
+		'q_your_waiting_approval' => 'Your question will be checked and approved shortly.',
+		'recat_button' => 'recategorize',
+		'recat_popup' => 'Change this question\'s category',
+		'recat_q_title' => 'Recategorize question',
+		'reject_button' => 'reject',
+		'remove_q_favorites' => 'Remove this question from my favorites',
+		'reopen_button' => 'reopen',
 		'reply_button' => 'reply',
 		'reply_c_popup' => 'Reply to this comment',
 		'reshow_button' => 'reshow',
+		'retag_button' => 'retag',
+		'retag_cat_popup' => 'Change this question\'s category or tags',
+		'retag_popup' => 'Change this question\'s tags',
+		'retag_q_title' => 'Retag question',
 		'select_popup' => 'Click to select as best answer',
 		'select_text' => 'Best answer',
+		'show_1_comment' => 'Show 1 comment',
+		'show_1_previous_comment' => 'Show 1 previous comment',
+		'show_x_comments' => 'Show ^ comments',
+		'show_x_previous_comments' => 'Show ^ previous comments',
 		'unflag_button' => 'unflag',
 		'unflag_popup' => 'Remove the flag that you added',
 		'unselect_popup' => 'Click to remove selection',

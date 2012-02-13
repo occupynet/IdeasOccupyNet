@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-pages.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for admin page for editing custom pages and external links
 
 
@@ -74,19 +73,21 @@
 		'nav_tags' => 'main/nav_tags',
 		'nav_categories' => 'main/nav_categories',
 		'nav_users' => 'main/nav_users',
+		'nav_ask' => 'main/nav_ask',
 	);
 	
 	$navpaths=array(
 		'nav_home' => '',
 		'nav_activity' => 'activity',
 		'nav_qa_not_home' => 'qa',
-		'nav_qa_is_home' => 'qa',
+		'nav_qa_is_home' => '',
 		'nav_questions' => 'questions',
 		'nav_hot' => 'hot',
 		'nav_unanswered' => 'unanswered',
 		'nav_tags' => 'tags',
 		'nav_categories' => 'categories',
 		'nav_users' => 'users',
+		'nav_ask' => 'ask',
 	);
 	
 	if (!qa_opt('show_custom_home'))
@@ -116,12 +117,18 @@
 		
 		if (qa_post_text('dodelete')) {
 			qa_db_page_delete($editpage['pageid']);
+			
+			$searchmodules=qa_load_modules_with('search', 'unindex_page');
+			foreach ($searchmodules as $searchmodule)
+				$searchmodule->unindex_page($editpage['pageid']);
+			
 			$editpage=null;
 			$reloadpages=true;
 		
 		} else {
 			$inname=qa_post_text('name');
 			$inposition=qa_post_text('position');
+			$inpermit=(int)qa_post_text('permit');
 			$inurl=qa_post_text('url');
 			$innewwindow=qa_post_text('newwindow');
 			$inheading=qa_post_text('heading');
@@ -211,15 +218,28 @@
 						isset($errors['name']) ? $editpage['title'] : $inname,
 						QA_PAGE_FLAGS_EXTERNAL | ($innewwindow ? QA_PAGE_FLAGS_NEW_WINDOW : 0),
 						isset($errors['url']) ? $editpage['tags'] : $inurl,
-						null, null);
+						null, null, $inpermit);
 
-				else
+				else {
+					$setheading=isset($errors['heading']) ? $editpage['heading'] : $inheading;
+					$setslug=isset($errors['slug']) ? $editpage['tags'] : $inslug;
+					$setcontent=isset($errors['content']) ? $editpage['content'] : $incontent;
+					
 					qa_db_page_set_fields($editpage['pageid'],
 						isset($errors['name']) ? $editpage['title'] : $inname,
 						0,
-						isset($errors['slug']) ? $editpage['tags'] : $inslug,
-						isset($errors['heading']) ? $editpage['heading'] : $inheading,
-						isset($errors['content']) ? $editpage['content'] : $incontent);
+						$setslug, $setheading, $setcontent, $inpermit);
+
+					$searchmodules=qa_load_modules_with('search', 'unindex_page');
+					foreach ($searchmodules as $searchmodule)
+						$searchmodule->unindex_page($editpage['pageid']);
+					
+					$indextext=qa_viewer_text($setcontent, 'html');
+					
+					$searchmodules=qa_load_modules_with('search', 'index_page');
+					foreach ($searchmodules as $searchmodule)
+						$searchmodule->index_page($editpage['pageid'], $setslug, $setheading, $setcontent, 'html', $indextext);
+				}
 				
 				qa_db_page_move($editpage['pageid'], substr($inposition, 0, 1), substr($inposition, 1));
 				
@@ -233,10 +253,17 @@
 			} else { // creating a new one
 				if (empty($errors)) {
 					if ($isexternal)
-						$pageid=qa_db_page_create($inname, QA_PAGE_FLAGS_EXTERNAL | ($innewwindow ? QA_PAGE_FLAGS_NEW_WINDOW : 0), $inurl, null, null);
-					else
-						$pageid=qa_db_page_create($inname, 0, $inslug, $inheading, $incontent);
+						$pageid=qa_db_page_create($inname, QA_PAGE_FLAGS_EXTERNAL | ($innewwindow ? QA_PAGE_FLAGS_NEW_WINDOW : 0), $inurl, null, null, $inpermit);
+					else {
+						$pageid=qa_db_page_create($inname, 0, $inslug, $inheading, $incontent, $inpermit);
+					
+						$indextext=qa_viewer_text($incontent, 'html');
 						
+						$searchmodules=qa_load_modules_with('search', 'index_page');
+						foreach ($searchmodules as $searchmodule)
+							$searchmodule->index_page($pageid, $inslug, $inheading, $incontent, 'html', $indextext);
+					}
+					
 					qa_db_page_move($pageid, substr($inposition, 0, 1), substr($inposition, 1));
 
 					$editpage=null;
@@ -246,7 +273,7 @@
 		}
 		
 		if ($reloadpages) {
-			unset($qa_nav_pages_cached);
+			qa_db_flush_pending_result('navpages');
 			$pages=qa_db_select_with_pending(qa_db_pages_selectspec());
 		}
 	}
@@ -302,8 +329,11 @@
 		
 		$positionvalue=@$positionoptions[$editpage['nav'].$editpage['position']];
 		
+		$permitoptions=qa_admin_permit_options(QA_PERMIT_ALL, QA_PERMIT_ADMINS, false, false);
+		$permitvalue=@$permitoptions[$editpage['permit']];
+		
 		$qa_content['form']=array(
-			'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+			'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 			
 			'style' => 'tall',
 			
@@ -329,6 +359,15 @@
 					'type' => 'select',
 					'options' => $positionoptions,
 					'value' => $positionvalue,
+				),
+				
+				'permit' => array(
+					'id' => 'permit_display',
+					'tags' => 'NAME="permit"',
+					'label' => qa_lang_html('admin/permit_to_view'),
+					'type' => 'select',
+					'options' => $permitoptions,
+					'value' => $permitvalue,
 				),
 				
 				'slug' => array(
@@ -404,6 +443,7 @@
 		if (isset($editpage['pageid']))
 			qa_set_display_rules($qa_content, array(
 				'position_display' => '!dodelete',
+				'permit_display' => '!dodelete',
 				($isexternal ? 'url_display' : 'slug_display') => '!dodelete',
 				($isexternal ? 'newwindow_display' : 'heading_display') => '!dodelete',
 				'content_display' => '!dodelete',
@@ -460,30 +500,33 @@
 			);
 		}
 		
+		$qa_content['form']['fields'][]=array(
+			'type' => 'blank'
+		);
+
 	//	List of suggested plugin pages
 
 		$listhtml='';
 		
-		$modulenames=qa_list_modules('page');
+		$pagemodules=qa_load_modules_with('page', 'suggest_requests');
 		
-		foreach ($modulenames as $tryname) {
-			$trypage=qa_load_module('page', $tryname);
-			
-			if (method_exists($trypage, 'suggest_requests')) {
-				$suggestrequests=$trypage->suggest_requests();
-			
-				foreach ($suggestrequests as $suggestrequest) {
-					$listhtml.='<LI><B><A HREF="'.qa_path_html($suggestrequest['request']).'">'.qa_html($suggestrequest['title']).'</A></B>';
-					
-					$listhtml.=qa_lang_html_sub('admin/from_plugin_module', qa_html($tryname));
+		foreach ($pagemodules as $tryname => $trypage) {
+			$suggestrequests=$trypage->suggest_requests();
+		
+			foreach ($suggestrequests as $suggestrequest) {
+				$listhtml.='<LI><B><A HREF="'.qa_path_html($suggestrequest['request']).'">'.qa_html($suggestrequest['title']).'</A></B>';
+				
+				$listhtml.=qa_lang_html_sub('admin/plugin_module', qa_html($tryname));
 
-					$listhtml.=strtr(qa_lang_html('admin/add_link_link'), array(
-						'^1' => '<A HREF="'.qa_path_html($qa_request, array('doaddlink' => 1, 'text' => $suggestrequest['title'], 'url' => $suggestrequest['request'], 'nav' => @$suggestrequest['nav'])).'">',
-						'^2' => '</A>',
-					));
-						
-					$listhtml.='</LI>';
-				}
+				$listhtml.=strtr(qa_lang_html('admin/add_link_link'), array(
+					'^1' => '<A HREF="'.qa_path_html(qa_request(), array('doaddlink' => 1, 'text' => $suggestrequest['title'], 'url' => $suggestrequest['request'], 'nav' => @$suggestrequest['nav'])).'">',
+					'^2' => '</A>',
+				));
+				
+				if (method_exists($trypage, 'admin_form'))
+					$listhtml.=' - <A HREF="'.qa_path_html('admin/plugins', null, null, null, md5('page/'.$tryname)).'">'.qa_lang_html('admin/options').'</A>';
+					
+				$listhtml.='</LI>';
 			}
 		}
 
@@ -516,8 +559,8 @@
 		);
 	}
 
-
 	$qa_content['navigation']['sub']=qa_admin_sub_navigation();
+
 	
 	return $qa_content;
 

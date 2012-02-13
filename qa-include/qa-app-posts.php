@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-posts.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Higher-level functions to create and manipulate posts
 
 
@@ -30,7 +29,6 @@
 		exit;
 	}
 	
-
 	require_once QA_INCLUDE_DIR.'qa-db.php';
 	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
@@ -39,20 +37,22 @@
 	require_once QA_INCLUDE_DIR.'qa-util-string.php';
 
 
-	function qa_post_create($type, $parentpostid, $title, $content, $format='', $categoryid=null, $tags=null, $userid=null, $notify=null, $email=null)
+	function qa_post_create($type, $parentid, $title, $content, $format='', $categoryid=null, $tags=null, $userid=null, $notify=null, $email=null, $extravalue=null)
 /*
 	Create a new post in the database, and return its postid.
 	
-	Set $type to 'Q' for a new question, 'A' for an answer, or 'C' for a comment. For questions, set $parentpostid to
+	Set $type to 'Q' for a new question, 'A' for an answer, or 'C' for a comment. You can also use 'Q_QUEUED',
+	'A_QUEUED' or 'C_QUEUED' to create a post which is queued for moderator approval. For questions, set $parentid to
 	the postid of the answer to which the question is related, or null if (as in most cases) the question is not related
-	to an answer. For answers, set $parentpostid to the postid of the question being answered. For comments, set
-	$parentpostid to the postid of the question or answer to which the comment relates. The $content and $format
-	parameters go together - if $format is '' then $content should be in plain UTF-8 text, and if $format is 'html' then
-	$content should be in UTF-8 HTML. Other values of $format may be allowed if an appropriate viewer module is
-	installed. The $title, $categoryid and $tags parameters are only relevant when creating a question - $tags can
-	either be an array of tags, or a string of tags separated by commas. The new post will be assigned to $userid if it
-	is not null, otherwise it will be anonymous. If $notify is true then the author will be sent notifications relating
-	to the post - either to $email if it is specified and valid, or to the current email address of $userid if $email is '@'.
+	to an answer. For answers, set $parentid to the postid of the question being answered. For comments, set $parentid
+	to the postid of the question or answer to which the comment relates. The $content and $format parameters go
+	together - if $format is '' then $content should be in plain UTF-8 text, and if $format is 'html' then $content
+	should be in UTF-8 HTML. Other values of $format may be allowed if an appropriate viewer module is installed. The
+	$title, $categoryid and $tags parameters are only relevant when creating a question - $tags can either be an array
+	of tags, or a string of tags separated by commas. The new post will be assigned to $userid if it is not null,
+	otherwise it will be anonymous. If $notify is true then the author will be sent notifications relating to the post -
+	either to $email if it is specified and valid, or to the current email address of $userid if $email is '@'. If
+	you're creating a question, the $extravalue parameter will be set as the custom extra field, if not null.
 */
 	{
 		$handle=qa_post_userid_to_handle($userid);
@@ -60,22 +60,25 @@
 
 		switch ($type) {
 			case 'Q':
-				$followanswer=isset($parentpostid) ? qa_post_get_full($parentpostid, 'A') : null;
+			case 'Q_QUEUED':
+				$followanswer=isset($parentid) ? qa_post_get_full($parentid, 'A') : null;
 				$tagstring=qa_post_tags_to_tagstring($tags);
-				$postid=qa_question_create($followanswer, $userid, $handle, null, $title, $content, $format, $text, $tagstring, $notify, $email, $categoryid);
+				$postid=qa_question_create($followanswer, $userid, $handle, null, $title, $content, $format, $text, $tagstring,
+					$notify, $email, $categoryid, $extravalue, $type=='Q_QUEUED');
 				break;
 				
 			case 'A':
-				$question=qa_post_get_full($parentpostid, 'Q');
-				$postid=qa_answer_create($userid, $handle, null, $content, $format, $text, $notify, $email, $question);
+			case 'A_QUEUED':
+				$question=qa_post_get_full($parentid, 'Q');
+				$postid=qa_answer_create($userid, $handle, null, $content, $format, $text, $notify, $email, $question, $type=='A_QUEUED');
 				break;
 				
 			case 'C':
-				$parentpost=qa_post_get_full($parentpostid, 'QA');
-				$commentsfollows=qa_db_single_select(qa_db_full_child_posts_selectspec(null, $parentpostid));
-				$question=qa_post_parent_to_question($parentpost);
-				$answer=qa_post_parent_to_answer($parentpost);
-				$postid=qa_comment_create($userid, $handle, null, $content, $format, $text, $notify, $email, $question, $answer, $commentsfollows);
+			case 'C_QUEUED':
+				$parent=qa_post_get_full($parentid, 'QA');
+				$commentsfollows=qa_db_single_select(qa_db_full_child_posts_selectspec(null, $parentid));
+				$question=qa_post_parent_to_question($parent);
+				$postid=qa_comment_create($userid, $handle, null, $content, $format, $text, $notify, $email, $question, $parent, $commentsfollows, $type=='C_QUEUED');
 				break;
 				
 			default:
@@ -87,11 +90,11 @@
 	}
 	
 	
-	function qa_post_set_content($postid, $title, $content, $format=null, $tags=null, $notify=null, $email=null, $byuserid=null)
+	function qa_post_set_content($postid, $title, $content, $format=null, $tags=null, $notify=null, $email=null, $byuserid=null, $extravalue=null)
 /*
-	Change the data stored for post $postid based on any of the $title, $content, $format, $tags, $notify and $email
-	parameters passed which are not null. The meaning of these parameters is the same as for qa_post_create() above.
-	Pass the identify of the user making this change in $byuserid (or null for an anonymous change).
+	Change the data stored for post $postid based on any of the $title, $content, $format, $tags, $notify, $email
+	and $extravalue parameters passed which are not null. The meaning of these parameters is the same as for
+	qa_post_create() above. Pass the identify of the user making this change in $byuserid (or null for anonymous).
 */
 	{
 		$oldpost=qa_post_get_full($postid, 'QAC');
@@ -120,7 +123,7 @@
 		switch ($oldpost['basetype']) {
 			case 'Q':
 				$tagstring=qa_post_tags_to_tagstring($tags);
-				qa_question_set_content($oldpost, $title, $content, $format, $text, $tagstring, $setnotify, $byuserid, $byhandle, null);
+				qa_question_set_content($oldpost, $title, $content, $format, $text, $tagstring, $setnotify, $byuserid, $byhandle, null, $extravalue);
 				break;
 				
 			case 'A':
@@ -129,10 +132,9 @@
 				break;
 				
 			case 'C':
-				$parentpost=qa_post_get_full($oldpost['parentid'], 'QA');
-				$question=qa_post_parent_to_question($parentpost);
-				$answer=qa_post_parent_to_answer($parentpost);		
-				qa_comment_set_content($oldpost, $content, $format, $text, $setnotify, $byuserid, $byhandle, null, $question, $answer);
+				$parent=qa_post_get_full($oldpost['parentid'], 'QA');
+				$question=qa_post_parent_to_question($parent);
+				qa_comment_set_content($oldpost, $content, $format, $text, $setnotify, $byuserid, $byhandle, null, $question, $parent);
 				break;
 		}
 	}
@@ -151,7 +153,8 @@
 			$byhandle=qa_post_userid_to_handle($byuserid);
 			$answers=qa_post_get_question_answers($postid);
 			$commentsfollows=qa_post_get_question_commentsfollows($postid);
-			qa_question_set_category($oldpost, $categoryid, $byuserid, $byhandle, null, $answers, $commentsfollows);
+			$closepost=qa_post_get_question_closepost($postid);
+			qa_question_set_category($oldpost, $categoryid, $byuserid, $byhandle, null, $answers, $commentsfollows, $closepost);
 
 		} else
 			qa_post_set_category($oldpost['parentid'], $categoryid, $byuserid); // keep looking until we find the parent question
@@ -175,6 +178,30 @@
 	}
 
 	
+	function qa_post_set_closed($questionid, $closed=true, $originalpostid=null, $note=null, $byuserid=null)
+/*
+	Closed $questionid if $closed is true, otherwise reopen it. If $closed is true, pass either the $originalpostid of
+	the question that it is a duplicate of, or a $note to explain why it's closed. Pass the identify of the user in
+	$byuserid (or null for an anonymous change).
+*/
+	{
+		$oldquestion=qa_post_get_full($questionid, 'Q');
+		$oldclosepost=qa_post_get_question_closepost($questionid);
+		$byhandle=qa_post_userid_to_handle($byuserid);
+		
+		if ($closed) {
+			if (isset($originalpostid))
+				qa_question_close_duplicate($oldquestion, $oldclosepost, $originalpostid, $byuserid, $byhandle, null);
+			elseif (isset($note))
+				qa_question_close_other($oldquestion, $oldclosepost, $note, $byuserid, $byhandle, null);
+			else
+				qa_fatal_error('Question must be closed as a duplicate or with a note');
+		
+		} else
+			qa_question_close_clear($oldquestion, $oldclosepost, $byuserid, $byhandle, null);
+	}
+	
+	
 	function qa_post_set_hidden($postid, $hidden=true, $byuserid=null)
 /*
 	Hide $postid if $hidden is true, show the post. Pass the identify of the user making this change in $byuserid (or
@@ -188,7 +215,8 @@
 			case 'Q':
 				$answers=qa_post_get_question_answers($postid);
 				$commentsfollows=qa_post_get_question_commentsfollows($postid);
-				qa_question_set_hidden($oldpost, $hidden, $byuserid, $byhandle, null, $answers, $commentsfollows);
+				$closepost=qa_post_get_question_closepost($postid);
+				qa_question_set_hidden($oldpost, $hidden, $byuserid, $byhandle, null, $answers, $commentsfollows, $closepost);
 				break;
 				
 			case 'A':
@@ -198,10 +226,9 @@
 				break;
 				
 			case 'C':
-				$parentpost=qa_post_get_full($oldpost['parentid'], 'QA');
-				$question=qa_post_parent_to_question($parentpost);
-				$answer=qa_post_parent_to_answer($parentpost);		
-				qa_comment_set_hidden($oldpost, $hidden, $byuserid, $byhandle, null, $question, $answer);
+				$parent=qa_post_get_full($oldpost['parentid'], 'QA');
+				$question=qa_post_parent_to_question($parent);
+				qa_comment_set_hidden($oldpost, $hidden, $byuserid, $byhandle, null, $question, $parent);
 				break;
 		}
 	}
@@ -223,11 +250,12 @@
 			case 'Q':
 				$answers=qa_post_get_question_answers($postid);
 				$commentsfollows=qa_post_get_question_commentsfollows($postid);
+				$closepost=qa_post_get_question_closepost($postid);
 				
 				if (count($answers) || count($commentsfollows))
 					qa_fatal_error('Could not delete question ID due to dependents: '.$postid);
 					
-				qa_question_delete($oldpost, null, null, null);
+				qa_question_delete($oldpost, null, null, null, $closepost);
 				break;
 				
 			case 'A':
@@ -241,10 +269,9 @@
 				break;
 				
 			case 'C':
-				$parentpost=qa_post_get_full($oldpost['parentid'], 'QA');
-				$question=qa_post_parent_to_question($parentpost);
-				$answer=qa_post_parent_to_answer($parentpost);		
-				qa_comment_delete($oldpost, $question, $answer, null, null, null);
+				$parent=qa_post_get_full($oldpost['parentid'], 'QA');
+				$question=qa_post_parent_to_question($parent);
+				qa_comment_delete($oldpost, $question, $parent, null, null, null);
 				break;
 		}
 	}
@@ -273,12 +300,21 @@
 */
 	{
 		if (isset($userid)) {
-			$user=qa_db_single_select(qa_db_user_account_selectspec($userid, true));
+			if (QA_FINAL_EXTERNAL_USERS) {
+				require_once QA_INCLUDE_DIR.'qa-app-users.php';
+				
+				$handles=qa_get_public_from_userids(array($userid));
+				
+				return @$handles[$userid];
 			
-			if (!is_array($user))
-				qa_fatal_error('User ID could not be found: '.$userid);
-			
-			return $user['handle'];
+			} else {
+				$user=qa_db_single_select(qa_db_user_account_selectspec($userid, true));
+				
+				if (!is_array($user))
+					qa_fatal_error('User ID could not be found: '.$userid);
+
+				return $user['handle'];
+			}
 		}
 		
 		return null;
@@ -350,6 +386,15 @@
 		
 		return $commentsfollows;
 	}
+	
+	
+	function qa_post_get_question_closepost($questionid)
+/*
+	Return the full database record for the post which closed $questionid, if there is any
+*/
+	{
+		return qa_db_single_select(qa_db_post_close_post_selectspec($questionid));
+	}
 
 	
 	function qa_post_get_answer_commentsfollows($answerid)
@@ -369,31 +414,17 @@
 	}
 	
 
-	function qa_post_parent_to_question($parentpost)
+	function qa_post_parent_to_question($parent)
 /*
-	Return $parentpost if it's the database record for a question, otherwise return the database record for its parent
+	Return $parent if it's the database record for a question, otherwise return the database record for its parent
 */
 	{
-		if ($parentpost['basetype']=='Q')
-			$question=$parentpost;
+		if ($parent['basetype']=='Q')
+			$question=$parent;
 		else
-			$question=qa_post_get_full($parentpost['parentid'], 'Q');
+			$question=qa_post_get_full($parent['parentid'], 'Q');
 		
 		return $question;
-	}
-
-	
-	function qa_post_parent_to_answer($parentpost)
-/*
-	Return $parentpost if it's the database record for an answer, otherwise return null
-*/
-	{
-		if ($parentpost['basetype']=='A')
-			$answer=$parentpost;
-		else
-			$answer=null;
-			
-		return $answer;
 	}
 	
 

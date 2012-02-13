@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-admin-categories.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for admin page for editing categories
 
 
@@ -96,16 +95,16 @@
 
 	if (qa_clicked('docancel')) {
 		if ($setmissing || $setparent)
-			qa_redirect($qa_request, array('edit' => $editcategory['categoryid']));
+			qa_redirect(qa_request(), array('edit' => $editcategory['categoryid']));
 		elseif (isset($editcategory['categoryid']))
-			qa_redirect($qa_request);
+			qa_redirect(qa_request());
 		else
-			qa_redirect($qa_request, array('edit' => @$editcategory['parentid']));
+			qa_redirect(qa_request(), array('edit' => @$editcategory['parentid']));
 		
 	} elseif (qa_clicked('dosetmissing')) {
 		$inreassign=qa_get_category_field_value('reassign');
 		qa_db_category_reassign($editcategory['categoryid'], $inreassign);
-		qa_redirect($qa_request, array('recalc' => 1, 'edit' => $editcategory['categoryid']));
+		qa_redirect(qa_request(), array('recalc' => 1, 'edit' => $editcategory['categoryid']));
 	
 	} elseif (qa_clicked('dosavecategory')) {
 		
@@ -115,7 +114,7 @@
 				$inreassign=qa_get_category_field_value('reassign');
 				qa_db_category_reassign($editcategory['categoryid'], $inreassign);
 				qa_db_category_delete($editcategory['categoryid']);
-				qa_redirect($qa_request, array('recalc' => 1, 'edit' => $editcategory['parentid']));
+				qa_redirect(qa_request(), array('recalc' => 1, 'edit' => $editcategory['parentid']));
 			}
 		
 		} else {
@@ -209,7 +208,7 @@
 						$recalc=($hassubcategory && ($inslug !== $editcategory['tags']));
 					}
 					
-					qa_redirect($qa_request, array('edit' => $editcategory['categoryid'], 'saved' => true, 'recalc' => (int)$recalc));
+					qa_redirect(qa_request(), array('edit' => $editcategory['categoryid'], 'saved' => true, 'recalc' => (int)$recalc));
 					
 				} else { // creating a new one
 					$categoryid=qa_db_category_create($inparentid, $inname, $inslug);
@@ -219,7 +218,7 @@
 					if (isset($inposition))
 						qa_db_category_set_position($categoryid, $inposition);
 					
-					qa_redirect($qa_request, array('edit' => $inparentid, 'added' => true));
+					qa_redirect(qa_request(), array('edit' => $inparentid, 'added' => true));
 				}
 			}
 		}
@@ -236,7 +235,7 @@
 	
 	if ($setmissing) {
 		$qa_content['form']=array(
-			'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+			'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 			
 			'style' => 'tall',
 			
@@ -274,7 +273,7 @@
 	} elseif (isset($editcategory)) {
 
 		$qa_content['form']=array(
-			'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+			'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 			
 			'style' => 'tall',
 
@@ -395,7 +394,7 @@
 					$qa_content['form']['fields']['questions']['error']=
 						strtr(qa_lang_html('admin/category_no_sub_error'), array(
 							'^q' => number_format($nosubcount),
-							'^1' => '<A HREF="'.qa_path_html($qa_request, array('edit' => $editcategory['categoryid'], 'missing' => 1)).'">',
+							'^1' => '<A HREF="'.qa_path_html(qa_request(), array('edit' => $editcategory['categoryid'], 'missing' => 1)).'">',
 							'^2' => '</A>',
 						));
 			}
@@ -432,12 +431,12 @@
 				);
 				
 				$qa_content['form']['fields']['parent']['value']=
-					'<A HREF="'.qa_path_html($qa_request, array('edit' => @$editcategory['parentid'])).'">'.
+					'<A HREF="'.qa_path_html(qa_request(), array('edit' => @$editcategory['parentid'])).'">'.
 					$qa_content['form']['fields']['parent']['value'].'</A>';
 				
 				if (isset($editcategory['categoryid']))
 					$qa_content['form']['fields']['parent']['value'].=' - '.
-						'<A HREF="'.qa_path_html($qa_request, array('edit' => $editcategory['categoryid'], 'setparent' => 1)).
+						'<A HREF="'.qa_path_html(qa_request(), array('edit' => $editcategory['categoryid'], 'setparent' => 1)).
 						'" STYLE="white-space: nowrap;"><SPAN>'.qa_lang_html('admin/category_move_parent').'</A>';
 			}
 
@@ -487,13 +486,13 @@
 					foreach ($categories as $category)
 						if (!strcmp($category['parentid'], $editcategory['categoryid']))
 							$childrenhtml.=(strlen($childrenhtml) ? ', ' : '').
-								'<A HREF="'.qa_path_html($qa_request, array('edit' => $category['categoryid'])).'">'.qa_html($category['title']).'</A>'.
+								'<A HREF="'.qa_path_html(qa_request(), array('edit' => $category['categoryid'])).'">'.qa_html($category['title']).'</A>'.
 								' ('.$category['qcount'].')';
 					
 					if (!strlen($childrenhtml))
 						$childrenhtml=qa_lang_html('admin/category_no_subs');
 					
-					$childrenhtml.=' - <A HREF="'.qa_path_html($qa_request, array('addsub' => $editcategory['categoryid'])).
+					$childrenhtml.=' - <A HREF="'.qa_path_html(qa_request(), array('addsub' => $editcategory['categoryid'])).
 						'" STYLE="white-space: nowrap;"><B>'.qa_lang_html('admin/category_add_sub').'</B></A>';
 					
 					$qa_content['form']['fields']['children']=array(
@@ -511,7 +510,7 @@
 			
 	} else {
 		$qa_content['form']=array(
-			'tags' => 'METHOD="POST" ACTION="'.qa_path_html($qa_request).'"',
+			'tags' => 'METHOD="POST" ACTION="'.qa_path_html(qa_request()).'"',
 			
 			'ok' => $savedoptions ? qa_lang_html('admin/options_saved') : null,
 			
@@ -548,7 +547,7 @@
 						qa_html($category['title']).'</A> - '.qa_lang_html_sub('main/x_questions', $category['qcount']).'<BR/>';
 
 			$qa_content['form']['fields']['nav']=array(
-				'label' => qa_lang_html('admin/click_category_edit'),
+				'label' => qa_lang_html('admin/top_level_categories'),
 				'type' => 'static',
 				'value' => $navcategoryhtml,
 			);
@@ -567,7 +566,7 @@
 					$qa_content['form']['fields']['allow_no_category']['error']=
 						strtr(qa_lang_html('admin/category_none_error'), array(
 							'^q' => number_format($nocatcount),
-							'^1' => '<A HREF="'.qa_path_html($qa_request, array('missing' => 1)).'">',
+							'^1' => '<A HREF="'.qa_path_html(qa_request(), array('missing' => 1)).'">',
 							'^2' => '</A>',
 						));
 			}
@@ -595,6 +594,7 @@
 	}
 	
 	$qa_content['navigation']['sub']=qa_admin_sub_navigation();
+
 	
 	return $qa_content;
 

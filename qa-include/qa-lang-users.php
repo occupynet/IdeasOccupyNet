@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-lang-users.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Language phrases for user management
 
 
@@ -27,21 +26,22 @@
 
 	return array(
 		'about' => 'About',
+		'add_user_x_favorites' => 'Add user ^ to my favorites',
 		'avatar_default' => 'Default',
 		'avatar_gravatar' => 'Show my ^1Gravatar^2',
 		'avatar_label' => 'Avatar:',
 		'avatar_none' => 'None',
 		'block_user_button' => 'Block User',
 		'blocked_users' => 'Blocked users',
+		'change_email_link' => ' - ^1change email^2',
 		'change_password' => 'Change Password',
 		'confirm_complete' => 'Thank you - your email address has been confirmed',
 		'confirm_emailed' => 'A confirmation link has been emailed to you. Please click the link to confirm your email address.',
+		'confirm_required' => 'To complete your registration, please click the confirmation link that has been emailed to you, or ^1request another^2.',
 		'confirm_title' => 'Email Address Confirmation',
 		'confirm_wrong_log_in' => 'Code not correct - please ^1log in^2 to send a new link',
 		'confirm_wrong_resend' => 'Code not correct - please click below to send a new link',
-                'disable_account' => 'Disable account',
-                'disable_account_explanation' => 'delete personal data but questions and answers will be maintained',
-		'edit_level_button' => 'Edit User Level',
+		'delete_user_button' => 'Delete User',
 		'edit_user_button' => 'Edit this User',
 		'email_confirmed' => 'Confirmed',
 		'email_exists' => 'Email already belongs to an account',
@@ -70,6 +70,8 @@
 		'login_button' => 'Log In',
 		'login_limit' => 'Too many login attempts - please try again in an hour',
 		'login_title' => 'Log in',
+		'mass_mailings_explanation' => 'Subscribe to emails sent out to all users',
+		'mass_mailings' => 'Mass mailings:',
 		'member_for' => 'Member for:',
 		'member_type' => 'Type:',
 		'new_password_1' => 'New password:',
@@ -91,10 +93,12 @@
 		'private_messages' => 'Private messages:',
 		'profile_saved' => 'Profile saved',
 		'register_button' => 'Register',
+		'register_limit' => 'Too many registrations - please try again in an hour',
 		'register_suspended' => 'Registration of new users has been temporarily suspended. Please try again soon.',
 		'register_title' => 'Register as a new user',
 		'registered_user' => 'Registered user',
 		'remember_label' => 'Remember me on this computer',
+		'remove_avatar' => 'Remove avatar:',
 		'reset_code_another' => 'send another',
 		'reset_code_emailed' => 'You have been emailed your reset code',
 		'reset_code_label' => 'Code:',
@@ -108,9 +112,12 @@
 		'send_reset_note' => 'A message will be sent to your email address with instructions.',
 		'special_users' => 'Special users',
 		'unblock_user_button' => 'Unblock User',
+		'unsubscribe_complete' => 'You have been unsubscribed from mass mailings sent out by ^0. You may resubscribe at any time via your ^1account^2 page.', 
+		'unsubscribe_title' => 'Unsubscribe',
+		'unsubscribe_wrong_log_in' => 'Code not correct - please ^1log in^2 to unsubscribe',
+		'unsubscribe' => 'Unsubscribe:',
 		'user_blocked' => '(blocked)',
 		'user_not_found' => 'User not found',
-		'view_account_page' => 'Return to ^1your account^2 page.',
 		'website' => 'Website',
 		'x_ago_from_y' => '^1 ago from ^2',
 	);

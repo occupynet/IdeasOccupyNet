@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/basic-adsense/qa-basic-adsense.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Widget module class for AdSense widget plugin
 
 
@@ -31,6 +30,7 @@
 		{
 			return ($template!='admin');
 		}
+
 		
 		function allow_region($region)
 		{
@@ -47,6 +47,7 @@
 			
 			return $allow;
 		}
+
 		
 		function admin_form(&$qa_content)
 		{
@@ -78,6 +79,7 @@
 				),
 			);
 		}
+
 
 		function output_widget($region, $place, $themeobject, $template, $request, $qa_content)
 		{
@@ -118,7 +120,7 @@ src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
 <?php
 		}
 	
-	};
+	}
 	
 
 /*

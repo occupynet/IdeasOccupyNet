@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-limits.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Monitoring and rate-limiting user actions (application level)
 
 
@@ -31,58 +30,79 @@
 	}
 
 
-	function qa_limits_remaining($userid, $actioncode)
+	define('QA_LIMIT_QUESTIONS', 'Q');
+	define('QA_LIMIT_ANSWERS', 'A');
+	define('QA_LIMIT_COMMENTS', 'C');
+	define('QA_LIMIT_VOTES', 'V');
+	define('QA_LIMIT_REGISTRATIONS', 'R');
+	define('QA_LIMIT_LOGINS', 'L');
+	define('QA_LIMIT_UPLOADS', 'U');
+	define('QA_LIMIT_FLAGS', 'F');
+	define('QA_LIMIT_MESSAGES', 'M');
+
+	
+	function qa_limits_remaining($userid, $action)
 /*
-	Return how many more times user $userid and/or the requesting IP can perform $actioncode this hour,
-	where $actioncode is Q/A/C/V/L/U/F/M for posting a question, answer, comment, voting or logging in,
-	uploading a file, flagging a post, or sending a private message.
+	Return how many more times user $userid and/or the requesting IP can perform $action this hour,
+	where $action is one of the QA_LIMIT_* constants defined above.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-db-limits.php';
 
 		$period=(int)(qa_opt('db_time')/3600);
-		$dblimits=qa_db_limits_get($userid, @$_SERVER['REMOTE_ADDR'], $actioncode);
+		$dblimits=qa_db_limits_get($userid, qa_remote_ip_address(), $action);
 		
-		switch ($actioncode) {
-			case 'Q':
+		switch ($action) {
+			case QA_LIMIT_QUESTIONS:
 				$userlimit=qa_opt('max_rate_user_qs');
 				$iplimit=qa_opt('max_rate_ip_qs');
 				break;
 				
-			case 'A':
+			case QA_LIMIT_ANSWERS:
 				$userlimit=qa_opt('max_rate_user_as');
 				$iplimit=qa_opt('max_rate_ip_as');
 				break;
 				
-			case 'C':
+			case QA_LIMIT_COMMENTS:
 				$userlimit=qa_opt('max_rate_user_cs');
 				$iplimit=qa_opt('max_rate_ip_cs');
 				break;
 
-			case 'V':
+			case QA_LIMIT_VOTES:
 				$userlimit=qa_opt('max_rate_user_votes');
 				$iplimit=qa_opt('max_rate_ip_votes');
 				break;
 				
-			case 'L':
+			case QA_LIMIT_REGISTRATIONS:
+				$userlimit=1; // not really relevant
+				$iplimit=qa_opt('max_rate_ip_registers');
+				break;
+
+			case QA_LIMIT_LOGINS:
 				$userlimit=1; // not really relevant
 				$iplimit=qa_opt('max_rate_ip_logins');
 				break;
 				
-			case 'U':
+			case QA_LIMIT_UPLOADS:
 				$userlimit=qa_opt('max_rate_user_uploads');
 				$iplimit=qa_opt('max_rate_ip_uploads');
 				break;
 				
-			case 'F':
+			case QA_LIMIT_FLAGS:
 				$userlimit=qa_opt('max_rate_user_flags');
 				$iplimit=qa_opt('max_rate_ip_flags');
 				break;
 				
-			case 'M':
+			case QA_LIMIT_MESSAGES:
 				$userlimit=qa_opt('max_rate_user_messages');
 				$iplimit=qa_opt('max_rate_ip_messages');
+				break;
+			
+			default:
+				qa_fatal_error('Unknown limit code in qa_limits_remaining: '.$action);
 				break;
 		}
 		
@@ -98,10 +118,12 @@
 	Return whether the requesting IP address has been blocked from write operations
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		$blockipclauses=qa_block_ips_explode(qa_opt('block_ips_write'));
 		
 		foreach ($blockipclauses as $blockipclause)
-			if (qa_block_ip_match(@$_SERVER['REMOTE_ADDR'], $blockipclause))
+			if (qa_block_ip_match(qa_remote_ip_address(), $blockipclause))
 				return true;
 				
 		return false;
@@ -145,70 +167,27 @@
 	
 	function qa_report_write_action($userid, $cookieid, $action, $questionid, $answerid, $commentid)
 /*
-	Called after a database write $action performed by a user identified by $userid and/or $cookieid,
-	relating to $questionid, $answerid and/or $commentid.
+	Called after a database write $action performed by a user identified by $userid and/or $cookieid.
 */
-	{
-		switch ($action) {
-			case 'q_post':
-			case 'q_claim':
-				qa_limits_increment($userid, 'Q');
-				break;
-			
-			case 'a_post':
-			case 'a_claim':
-				qa_limits_increment($userid, 'A');
-				break;
-				
-			case 'c_post':
-			case 'c_claim':
-			case 'a_to_c':
-				qa_limits_increment($userid, 'C');
-				break;
-			
-			case 'q_vote_up':
-			case 'q_vote_down':
-			case 'q_vote_nil':
-			case 'a_vote_up':
-			case 'a_vote_down':
-			case 'a_vote_nil':
-				qa_limits_increment($userid, 'V');
-				break;
-				
-			case 'q_flag':
-			case 'a_flag':
-			case 'c_flag':
-				qa_limits_increment($userid, 'F');
-				break;
-		}
-
-		if (isset($userid)) {
-			require_once QA_INCLUDE_DIR.'qa-app-users.php';
-			
-			qa_user_report_action($userid, $action, $questionid, $answerid, $commentid);
-		}
-		
-		if (isset($cookieid)) {
-			require_once QA_INCLUDE_DIR.'qa-app-cookies.php';
-
-			qa_cookie_report_action($cookieid, $action, $questionid, $answerid, $commentid);
-		}
-	}
+	{}
 
 	
-	function qa_limits_increment($userid, $actioncode)
+	function qa_limits_increment($userid, $action)
 /*
-	Take note for rate limits that user $userid and/or the requesting IP just performed $actioncode
+	Take note for rate limits that user $userid and/or the requesting IP just performed $action,
+	where $action is one of the QA_LIMIT_* constants defined above.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-limits.php';
 
 		$period=(int)(qa_opt('db_time')/3600);
 		
 		if (isset($userid))
-			qa_db_limits_user_add($userid, $actioncode, $period, 1);
+			qa_db_limits_user_add($userid, $action, $period, 1);
 		
-		qa_db_limits_ip_add(@$_SERVER['REMOTE_ADDR'], $actioncode, $period, 1);
+		qa_db_limits_ip_add(qa_remote_ip_address(), $action, $period, 1);
 	}
 
 

@@ -1,15 +1,14 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-captcha.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: Wrapper functions and utilities for reCAPTCHA
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Wrapper functions and utilities for captcha modules
 
 
 	This program is free software; you can redistribute it and/or
@@ -31,109 +30,66 @@
 	}
 
 
-	function qa_captcha_possible()
+	function qa_captcha_available()
 /*
-	Return true if it will be possible to present a captcha to the user, false otherwise
+	Return whether a captcha module has been selected and it indicates that it is fully set up to go
 */
 	{
-		$options=qa_get_options(array('recaptcha_public_key', 'recaptcha_private_key'));
+		$module=qa_load_module('captcha', qa_opt('captcha_module'));
 		
-		return function_exists('fsockopen') && strlen(trim($options['recaptcha_public_key'])) && strlen(trim($options['recaptcha_private_key']));
+		return isset($module) && ( (!method_exists($module, 'allow_captcha')) || $module->allow_captcha());
 	}
 	
-
-	function qa_captcha_error()
-/*
-	Return string of error to display in admin interface if captchas are not possible, null otherwise
-*/
-	{
-		if (qa_captcha_possible())
-			return null;
-		
-		elseif (!function_exists('fsockopen'))
-			return qa_lang_html('admin/recaptcha_fsockopen');
-		
-		else {
-			require_once QA_INCLUDE_DIR.'qa-recaptchalib.php';
-	
-			$url=recaptcha_get_signup_url(@$_SERVER['HTTP_HOST'], qa_opt('site_title'));
-			
-			return strtr(
-				qa_lang_html('admin/recaptcha_get_keys'),
-				
-				array(
-					'^1' => '<A HREF="'.qa_html($url).'">',
-					'^2' => '</A>',
-				)
-			);
-		}
-	}
-
-	
-	function qa_captcha_html($error)
-/*
-	Return the html to display for a captcha, pass $error as returned by earlier qa_captcha_validate()
-*/
-	{
-		require_once QA_INCLUDE_DIR.'qa-recaptchalib.php';
-
-		return recaptcha_get_html(qa_opt('recaptcha_public_key'), $error, qa_is_https_probably());
-	}
-
-	
-	function qa_captcha_validate($form, &$errors)
-/*
-	Check if captcha correct based on fields submitted in $form and set $errors['captcha'] accordingly
-*/
-	{
-		if (qa_captcha_possible()) {
-			require_once QA_INCLUDE_DIR.'qa-recaptchalib.php';
-			
-			if ( (!empty($form['recaptcha_challenge_field'])) && (!empty($form['recaptcha_response_field'])) ) {
-				$answer=recaptcha_check_answer(
-					qa_opt('recaptcha_private_key'),
-					@$_SERVER['REMOTE_ADDR'],
-					@$form['recaptcha_challenge_field'],
-					@$form['recaptcha_response_field']
-				);
-				
-				if (!$answer->is_valid)
-					$errors['captcha']=@$answer->error;
-
-			} else
-				$errors['captcha']=true; // empty error but still set it
-		}
-	}
-
 	
 	function qa_set_up_captcha_field(&$qa_content, &$fields, $errors, $note=null)
 /*
-	Prepare $qa_content for showing a captcha, adding the element to $fields,
-	given previous $errors, and a $note to display
+	Prepare $qa_content for showing a captcha, adding the element to $fields, given previous $errors, and a $note to display
 */
 	{
-		if (qa_captcha_possible()) {
+		if (qa_captcha_available()) {
+			$captcha=qa_load_module('captcha', qa_opt('captcha_module'));
+			
+			$count=@++$qa_content['qa_captcha_count']; // work around fact that reCAPTCHA can only display per page
+			
+			if ($count>1)
+				$html='[captcha placeholder]'; // single captcha will be moved about the page, to replace this
+			else {
+				$qa_content['script_var']['qa_captcha_in']='qa_captcha_div_1';
+				$html=$captcha->form_html($qa_content, @$errors['captcha']);
+			}
+			
 			$fields['captcha']=array(
 				'type' => 'custom',
 				'label' => qa_lang_html('misc/captcha_label'),
-				'html' => qa_captcha_html(@$errors['captcha']),
-				'error' => isset($errors['captcha']) ? qa_lang_html('misc/captcha_error') : null,
+				'html' => '<DIV ID="qa_captcha_div_'.$count.'">'.$html.'</DIV>',
+				'error' => @array_key_exists('captcha', $errors) ? qa_lang_html('misc/captcha_error') : null,
 				'note' => $note,
 			);
-			
-			$language=qa_opt('site_language');
-			if (strpos('|en|nl|fr|de|pt|ru|es|tr|', '|'.$language.'|')===false) // supported as of 3/2010
-				$language='en';
-			
-			$qa_content['script_lines'][]=array(
-				"var RecaptchaOptions = {",
-				"\ttheme:'white',",
-				"\tlang:".qa_js($language),
-				"}",
-			);
+					
+			return "if (qa_captcha_in!='qa_captcha_div_".$count."') { document.getElementById('qa_captcha_div_".$count."').innerHTML=document.getElementById(qa_captcha_in).innerHTML; document.getElementById(qa_captcha_in).innerHTML=''; qa_captcha_in='qa_captcha_div_".$count."'; }";
 		}
+		
+		return '';
 	}
-	
+
+
+	function qa_captcha_validate_post(&$errors)
+/*
+	Check if captcha is submitted correctly, and if not, set $errors['captcha'] to a descriptive string
+*/
+	{
+		if (qa_captcha_available()) {
+			$captcha=qa_load_module('captcha', qa_opt('captcha_module'));
+			
+			if (!$captcha->validate_post($error)) {
+				$errors['captcha']=$error;
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
 
 /*
 	Omit PHP closing tag to help avoid accidental output

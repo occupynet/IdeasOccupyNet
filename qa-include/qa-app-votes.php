@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-app-votes.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Handling incoming votes (application level)
 
 
@@ -31,13 +30,16 @@
 	}
 
 
-	function qa_vote_error_html($post, $userid, $topage)
+	function qa_vote_error_html($post, $vote, $userid, $topage)
 /*
 	Check if $userid can vote on $post, on the page $topage.
 	Return an HTML error to display if there was a problem, or false if it's OK.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-app-users.php';
+		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
 		if (
 			is_array($post) &&
@@ -45,14 +47,19 @@
 			qa_opt(($post['basetype']=='Q') ? 'voting_on_qs' : 'voting_on_as') &&
 			( (!isset($post['userid'])) || (!isset($userid)) || ($post['userid']!=$userid) )
 		) {
+			$permiterror=qa_user_permit_error(($post['basetype']=='Q') ? 'permit_vote_q' : 'permit_vote_a', QA_LIMIT_VOTES);
 			
-			switch (qa_user_permit_error(($post['basetype']=='Q') ? 'permit_vote_q' : 'permit_vote_a', 'V')) {
+			$errordownonly=(!$permiterror) && ($vote<0);
+			if ($errordownonly)
+				$permiterror=qa_user_permit_error('permit_vote_down');
+				
+			switch ($permiterror) {
 				case 'login':
 					return qa_insert_login_links(qa_lang_html('main/vote_must_login'), $topage);
 					break;
 					
 				case 'confirm':
-					return qa_insert_login_links(qa_lang_html('main/vote_must_confirm'), $topage);
+					return qa_insert_login_links(qa_lang_html($errordownonly ? 'main/vote_down_must_confirm' : 'main/vote_must_confirm'), $topage);
 					break;
 					
 				case 'limit':
@@ -78,9 +85,12 @@
 	Handles user points, recounting and event reports as appropriate.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-points.php';
 		require_once QA_INCLUDE_DIR.'qa-db-hotness.php';
 		require_once QA_INCLUDE_DIR.'qa-db-votes.php';
+		require_once QA_INCLUDE_DIR.'qa-db-post-create.php';
 		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
 		$vote=(int)min(1, max(-1, $vote));
@@ -90,6 +100,11 @@
 		qa_db_post_recount_votes($post['postid']);
 		
 		$postisanswer=($post['basetype']=='A');
+		
+		if ($postisanswer) {
+			qa_db_post_acount_update($post['parentid']);
+			qa_db_unupaqcount_update();
+		}
 		
 		$columns=array();
 		
@@ -107,15 +122,13 @@
 			qa_db_hotness_update($post['postid']);
 		
 		if ($vote<0)
-			$action=$postisanswer ? 'a_vote_down' : 'q_vote_down';
+			$event=$postisanswer ? 'a_vote_down' : 'q_vote_down';
 		elseif ($vote>0)
-			$action=$postisanswer ? 'a_vote_up' : 'q_vote_up';
+			$event=$postisanswer ? 'a_vote_up' : 'q_vote_up';
 		else
-			$action=$postisanswer ? 'a_vote_nil' : 'q_vote_nil';
+			$event=$postisanswer ? 'a_vote_nil' : 'q_vote_nil';
 		
-		qa_report_write_action($userid, null, $action, $postisanswer ? null : $post['postid'], $postisanswer ? $post['postid'] : null, null);
-
-		qa_report_event($action, $userid, $handle, $cookieid, array(
+		qa_report_event($event, $userid, $handle, $cookieid, array(
 			'postid' => $post['postid'],
 			'vote' => $vote,
 			'oldvote' => $oldvote,
@@ -129,9 +142,12 @@
 	Return an HTML error to display if there was a problem, or false if it's OK.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 		require_once QA_INCLUDE_DIR.'qa-app-options.php';
 		require_once QA_INCLUDE_DIR.'qa-app-users.php';
+		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 
 		if (
 			is_array($post) &&
@@ -139,7 +155,7 @@
 			( (!isset($post['userid'])) || (!isset($userid)) || ($post['userid']!=$userid) )
 		) {
 		
-			switch (qa_user_permit_error('permit_flag', 'F')) {
+			switch (qa_user_permit_error('permit_flag', QA_LIMIT_FLAGS)) {
 				case 'login':
 					return qa_insert_login_links(qa_lang_html('question/flag_must_login'), $topage);
 					break;
@@ -165,134 +181,118 @@
 	}
 	
 
-	function qa_flag_set_tohide($post, $userid, $handle, $cookieid, $question)
+	function qa_flag_set_tohide($oldpost, $userid, $handle, $cookieid, $question)
 /*
-	Set (application level) a flag by $userid (with $handle and $cookieid) on $post which belongs to $question.
+	Set (application level) a flag by $userid (with $handle and $cookieid) on $oldpost which belongs to $question.
 	Handles recounting, admin notifications and event reports as appropriate.
 	Returns true if the post should now be hidden because it has accumulated enough flags.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-votes.php';
 		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
-		qa_db_userflag_set($post['postid'], $userid, true);
-		qa_db_post_recount_flags($post['postid']);
+		qa_db_userflag_set($oldpost['postid'], $userid, true);
+		qa_db_post_recount_flags($oldpost['postid']);
 		
-		switch ($post['basetype']) {
+		switch ($oldpost['basetype']) {
 			case 'Q':
-				$action='q_flag';
+				$event='q_flag';
 				break;
 				
 			case 'A':
-				$action='a_flag';
+				$event='a_flag';
 				break;
 
 			case 'C':
-				$action='c_flag';
+				$event='c_flag';
 				break;
 		}
 		
-		qa_report_write_action($userid, null, $action, ($post['basetype']=='Q') ? $post['postid'] : null,
-			($post['basetype']=='A') ? $post['postid'] : null, ($post['basetype']=='C') ? $post['postid'] : null);
-
-		qa_report_event($action, $userid, $handle, $cookieid, array(
-			'postid' => $post['postid'],
+		$post=qa_db_select_with_pending(qa_db_full_post_selectspec(null, $oldpost['postid']));
+		
+		qa_report_event($event, $userid, $handle, $cookieid, array(
+			'postid' => $oldpost['postid'],
+			'oldpost' => $oldpost,
+			'flagcount' => $post['flagcount'],
+			'questionid' => $question['postid'],
+			'question' => $question,
 		));
 		
-		$post=qa_db_select_with_pending(qa_db_full_post_selectspec(null, $post['postid']));
-		
-		$flagcount=$post['flagcount'];
-		$notifycount=$flagcount-qa_opt('flagging_notify_first');
-		
-		if ( ($notifycount>=0) && (($notifycount % qa_opt('flagging_notify_every'))==0) ) {
-			require_once QA_INCLUDE_DIR.'qa-app-emails.php';
-			require_once QA_INCLUDE_DIR.'qa-app-format.php';
-			
-			$anchor=($post['basetype']=='Q') ? null : qa_anchor($post['basetype'], $post['postid']);
-			
-			qa_send_notification(null, qa_opt('feedback_email'), null, qa_lang('emails/flagged_subject'), qa_lang('emails/flagged_body'), array(
-				'^p_handle' => isset($post['handle']) ? $post['handle'] : qa_lang('main/anonymous'),
-				'^flags' => ($flagcount==1) ? qa_lang_html_sub('main/1_flag', '1', '1') : qa_lang_html_sub('main/x_flags', $flagcount),
-				'^p_context' => trim(@$post['title']."\n\n".qa_viewer_text($post['content'], $post['format'])),
-				'^url' => qa_path(qa_q_request($question['postid'], $question['title']), null, qa_opt('site_url'), null, $anchor),
-			));
-		}
-		
-		if ( ($flagcount>=qa_opt('flagging_hide_after')) && !$post['hidden'] )
-			return true;
-		
-		return false;
+		return ($post['flagcount']>=qa_opt('flagging_hide_after')) && !$post['hidden'];
 	}
 
 
-	function qa_flag_clear($post, $userid, $handle, $cookieid)
+	function qa_flag_clear($oldpost, $userid, $handle, $cookieid)
 /*
-	Clear (application level) a flag on $post by $userid (with $handle and $cookieid).
+	Clear (application level) a flag on $oldpost by $userid (with $handle and $cookieid).
 	Handles recounting and event reports as appropriate.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-votes.php';
 		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
-		qa_db_userflag_set($post['postid'], $userid, false);
-		qa_db_post_recount_flags($post['postid']);
+		qa_db_userflag_set($oldpost['postid'], $userid, false);
+		qa_db_post_recount_flags($oldpost['postid']);
 		
-		switch ($post['basetype']) {
+		switch ($oldpost['basetype']) {
 			case 'Q':
-				$action='q_unflag';
+				$event='q_unflag';
 				break;
 				
 			case 'A':
-				$action='a_unflag';
+				$event='a_unflag';
 				break;
 
 			case 'C':
-				$action='c_unflag';
+				$event='c_unflag';
 				break;
 		}
 		
-		qa_report_write_action($userid, null, $action, ($post['basetype']=='Q') ? $post['postid'] : null,
-			($post['basetype']=='A') ? $post['postid'] : null, ($post['basetype']=='C') ? $post['postid'] : null);
-
-		qa_report_event($action, $userid, $handle, $cookieid, array(
-			'postid' => $post['postid'],
+		qa_report_event($event, $userid, $handle, $cookieid, array(
+			'postid' => $oldpost['postid'],
+			'oldpost' => $oldpost,
 		));
 	}
 	
 	
-	function qa_flags_clear_all($post, $userid, $handle, $cookieid)
+	function qa_flags_clear_all($oldpost, $userid, $handle, $cookieid)
 /*
-	Clear (application level) all flags on $post by $userid (with $handle and $cookieid).
+	Clear (application level) all flags on $oldpost by $userid (with $handle and $cookieid).
 	Handles recounting and event reports as appropriate.
 */
 	{
+		if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
+		
 		require_once QA_INCLUDE_DIR.'qa-db-votes.php';
 		require_once QA_INCLUDE_DIR.'qa-app-limits.php';
 		
-		qa_db_userflags_clear_all($post['postid']);
-		qa_db_post_recount_flags($post['postid']);
+		qa_db_userflags_clear_all($oldpost['postid']);
+		qa_db_post_recount_flags($oldpost['postid']);
 
-		switch ($post['basetype']) {
+		switch ($oldpost['basetype']) {
 			case 'Q':
-				$action='q_clearflags';
+				$event='q_clearflags';
 				break;
 				
 			case 'A':
-				$action='a_clearflags';
+				$event='a_clearflags';
 				break;
 
 			case 'C':
-				$action='c_clearflags';
+				$event='c_clearflags';
 				break;
 		}
 
-		qa_report_write_action($userid, null, $action, ($post['basetype']=='Q') ? $post['postid'] : null,
-			($post['basetype']=='A') ? $post['postid'] : null, ($post['basetype']=='C') ? $post['postid'] : null);
-
-		qa_report_event($action, $userid, $handle, $cookieid, array(
-			'postid' => $post['postid'],
+		qa_report_event($event, $userid, $handle, $cookieid, array(
+			'postid' => $oldpost['postid'],
+			'oldpost' => $oldpost,
 		));
 	}
+
 
 /*
 	Omit PHP closing tag to help avoid accidental output

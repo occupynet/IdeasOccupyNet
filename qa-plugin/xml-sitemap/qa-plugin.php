@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/xml-sitemap/qa-plugin.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Initiates XML sitemap plugin
 
 
@@ -29,12 +28,13 @@
 	Plugin Name: XML Sitemap
 	Plugin URI: 
 	Plugin Description: Generates sitemap.xml file for submission to search engines
-	Plugin Version: 1.0
-	Plugin Date: 2010-10-31
+	Plugin Version: 1.1.1
+	Plugin Date: 2011-12-06
 	Plugin Author: Question2Answer
 	Plugin Author URI: http://www.question2answer.org/
 	Plugin License: GPLv2
-	Plugin Minimum Question2Answer Version: 1.3
+	Plugin Minimum Question2Answer Version: 1.5
+	Plugin Update Check URI: 
 */
 
 

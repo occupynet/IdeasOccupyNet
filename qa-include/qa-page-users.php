@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-users.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for top scoring users page
 
 
@@ -37,7 +36,8 @@
 
 //	Get list of all users
 	
-	$users=qa_db_select_with_pending(qa_db_top_users_selectspec($qa_start));
+	$start=qa_get_start();	
+	$users=qa_db_select_with_pending(qa_db_top_users_selectspec($start, qa_opt_if_loaded('page_size_users')));
 	
 	$usercount=qa_opt('cache_userpointscount');
 	$pagesize=qa_opt('page_size_users');
@@ -51,7 +51,11 @@
 
 	$qa_content['title']=qa_lang_html('main/highest_users');
 
-	$qa_content['ranking']=array('items' => array(), 'rows' => ceil($pagesize/qa_opt('columns_users')), 'type' => 'users');
+	$qa_content['ranking']=array(
+		'items' => array(),
+		'rows' => ceil($pagesize/qa_opt('columns_users')),
+		'type' => 'users'
+	);
 	
 	if (count($users)) {
 		foreach ($users as $userid => $user)
@@ -64,7 +68,7 @@
 	} else
 		$qa_content['title']=qa_lang_html('main/no_active_users');
 	
-	$qa_content['page_links']=qa_html_page_links($qa_request, $qa_start, $pagesize, $usercount, qa_opt('pages_prev_next'));
+	$qa_content['page_links']=qa_html_page_links(qa_request(), $start, $pagesize, $usercount, qa_opt('pages_prev_next'));
 
 	$qa_content['navigation']['sub']=qa_users_sub_navigation();
 	

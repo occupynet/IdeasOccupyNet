@@ -1,14 +1,13 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-lang-profile.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Language phrases for user profile page
 
 
@@ -32,24 +31,30 @@
 		'1_with_best_chosen' => ' (1 with best answer chosen)',
 		'activity_by_x' => 'Activity by ^',
 		'answers' => 'Answers:',
+		'bonus_points' => 'Bonus points:',
 		'comments' => 'Comments:',
 		'extra_privileges' => 'Extra privileges:',
 		'gave_out' => 'Gave out:',
 		'my_account_title' => 'My account details',
 		'no_posts_by_x' => 'No posts by ^',
 		'permit_anon_view_ips' => 'Viewing IPs of anonymous posts',
+		'permit_close_q' => 'Closing any question',
 		'permit_delete_hidden' => 'Deleting hidden posts',
 		'permit_edit_a' => 'Editing any answer',
 		'permit_edit_c' => 'Editing any comment',
 		'permit_edit_q' => 'Editing any question',
 		'permit_flag' => 'Flagging posts',
 		'permit_hide_show' => 'Hiding or showing any post',
+		'permit_moderate' => 'Approving or rejecting posts',
 		'permit_post_a' => 'Answering questions',
 		'permit_post_c' => 'Adding comments',
 		'permit_post_q' => 'Asking questions',
+		'permit_recat' => 'Recategorizing any question',
+		'permit_retag' => 'Retagging any question',
 		'permit_select_a' => 'Selecting answer for any question',
 		'permit_view_q_page' => 'Viewing question pages',
 		'permit_vote_a' => 'Voting on answers',
+		'permit_vote_down' => 'Voting posts down',
 		'permit_vote_q' => 'Voting on questions',
 		'questions' => 'Questions:',
 		'ranked_x' => ' (ranked #^)',
@@ -57,6 +62,7 @@
 		'recent_activity_by_x' => 'Recent activity by ^',
 		'score' => 'Score:',
 		'send_private_message' => ' - ^1send private message^2',
+		'set_bonus_button' => 'Update bonus',
 		'title' => 'Title:',
 		'user_x' => 'User ^',
 		'voted_on' => 'Voted on:',

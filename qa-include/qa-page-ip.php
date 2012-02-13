@@ -1,15 +1,14 @@
 <?php
 	
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-ip.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
-	Description: Controller for page showing activity for an IP address
+	Version: See define()s at top of qa-include/qa-base.php
+	Description: Controller for page showing recent activity for an IP address
 
 
 	This program is free software; you can redistribute it and/or
@@ -34,22 +33,28 @@
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
 
 	
-	$ip=@$pass_subrequests[0]; // picked up from qa-page.php
+	$ip=qa_request_part(1); // picked up from qa-page.php
 	if (long2ip(ip2long($ip))!==$ip)
 		return include QA_INCLUDE_DIR.'qa-page-not-found.php';
 
 
-//	Find recently (hidden or not) questions, answers, comments and edits
+//	Find recently (hidden, queued or not) questions, answers, comments and edits for this IP
 
-	list($qs, $qs_hidden, $a_qs, $a_hidden_qs, $c_qs, $c_hidden_qs, $edit_qs)=qa_db_select_with_pending(
-		qa_db_qs_selectspec($qa_login_userid, 'created', 0, null, $ip, false),
-		qa_db_qs_selectspec($qa_login_userid, 'created', 0, null, $ip, true, true),
-		qa_db_recent_a_qs_selectspec($qa_login_userid, 0, null, $ip, false),
-		qa_db_recent_a_qs_selectspec($qa_login_userid, 0, null, $ip, true, true),
-		qa_db_recent_c_qs_selectspec($qa_login_userid, 0, null, $ip, false),
-		qa_db_recent_c_qs_selectspec($qa_login_userid, 0, null, $ip, true, true),
-		qa_db_recent_edit_qs_selectspec($qa_login_userid, 0, null, $ip, false)
-	);
+	$userid=qa_get_logged_in_userid();
+
+	list($qs, $qs_queued, $qs_hidden, $a_qs, $a_queued_qs, $a_hidden_qs, $c_qs, $c_queued_qs, $c_hidden_qs, $edit_qs)=
+		qa_db_select_with_pending(
+			qa_db_qs_selectspec($userid, 'created', 0, null, $ip, false),
+			qa_db_qs_selectspec($userid, 'created', 0, null, $ip, 'Q_QUEUED'),
+			qa_db_qs_selectspec($userid, 'created', 0, null, $ip, 'Q_HIDDEN', true),
+			qa_db_recent_a_qs_selectspec($userid, 0, null, $ip, false),
+			qa_db_recent_a_qs_selectspec($userid, 0, null, $ip, 'A_QUEUED'),
+			qa_db_recent_a_qs_selectspec($userid, 0, null, $ip, 'A_HIDDEN', true),
+			qa_db_recent_c_qs_selectspec($userid, 0, null, $ip, false),
+			qa_db_recent_c_qs_selectspec($userid, 0, null, $ip, 'C_QUEUED'),
+			qa_db_recent_c_qs_selectspec($userid, 0, null, $ip, 'C_HIDDEN', true),
+			qa_db_recent_edit_qs_selectspec($userid, 0, null, $ip, false)
+		);
 	
 	
 //	Check we have permission to view this page, and whether we can block or unblock IPs
@@ -69,7 +74,12 @@
 		if (qa_clicked('doblock')) {
 			$oldblocked=qa_opt('block_ips_write');
 			qa_set_option('block_ips_write', (strlen($oldblocked) ? ($oldblocked.' , ') : '').$ip);
-			qa_redirect($qa_request);
+			
+			qa_report_event('ip_block', $userid, qa_get_logged_in_handle(), qa_cookie_get(), array(
+				'ip' => $ip,
+			));
+			
+			qa_redirect(qa_request());
 		}
 		
 		if (qa_clicked('dounblock')) {
@@ -82,7 +92,12 @@
 					unset($blockipclauses[$key]);
 					
 			qa_set_option('block_ips_write', implode(' , ', $blockipclauses));
-			qa_redirect($qa_request);
+
+			qa_report_event('ip_unblock', $userid, qa_get_logged_in_handle(), qa_cookie_get(), array(
+				'ip' => $ip,
+			));
+
+			qa_redirect(qa_request());
 		}
 		
 		if (qa_clicked('dohideall') && !qa_user_permit_error('permit_hide_show')) {
@@ -92,16 +107,16 @@
 			$postids=qa_db_get_ip_visible_postids($ip);
 
 			foreach ($postids as $postid)
-				qa_post_set_hidden($postid, true, $qa_login_userid);
+				qa_post_set_hidden($postid, true, $userid);
 				
-			qa_redirect($qa_request);
+			qa_redirect(qa_request());
 		}
 	}
 	
 
 //	Combine sets of questions and get information for users
 
-	$questions=qa_any_sort_by_date(array_merge($qs, $qs_hidden, $a_qs, $a_hidden_qs, $c_qs, $c_hidden_qs, $edit_qs));
+	$questions=qa_any_sort_by_date(array_merge($qs, $qs_queued, $qs_hidden, $a_qs, $a_queued_qs, $a_hidden_qs, $c_qs, $c_queued_qs, $c_hidden_qs, $edit_qs));
 	
 	$usershtml=qa_userids_handles_html(qa_any_get_userids_handles($questions));
 
@@ -176,11 +191,21 @@
 			$htmloptions['voteview']=false;
 			$htmloptions['ipview']=false;
 			$htmloptions['answersview']=false;
+			$htmloptions['updateview']=false;
 			
-			$htmlfields=qa_any_to_q_html_fields($question, $qa_login_userid, $qa_cookieid, $usershtml, null, $htmloptions);
+			$htmlfields=qa_any_to_q_html_fields($question, $userid, qa_cookie_get(), $usershtml, null, $htmloptions);
 			
 			if (isset($htmlfields['what_url'])) // link directly to relevant content
 				$htmlfields['url']=$htmlfields['what_url'];
+			
+			$hasother=isset($question['opostid']);
+			
+			if ($question[$hasother ? 'ohidden' : 'hidden']) {
+				$htmlfields['what_2']=qa_lang_html('main/hidden');
+
+				if (@$htmloptions['whenview'])
+					$htmlfields['when_2']=qa_when_to_html($question[$hasother ? 'oupdated' : 'updated'], @$htmloptions['fulldatedays']);
+			}
 
 			$qa_content['q_list']['qs'][]=$htmlfields;
 		}

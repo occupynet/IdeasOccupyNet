@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-confirm.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for email confirmation page (can also request a new code)
 
 
@@ -35,25 +34,20 @@
 	
 	if (QA_FINAL_EXTERNAL_USERS)
 		qa_fatal_error('User login is handled by external code');
-		
-	if (qa_user_permit_error()) {
-		$qa_content=qa_content_prepare();
-		$qa_content['error']=qa_lang_html('users/no_permission');
-		return $qa_content;
-	}
 
 
 //	Check if we've been asked to send a new link or have a successful email confirmation
 
 	$incode=trim(qa_get('c')); // trim to prevent passing in blank values to match uninitiated DB rows
 	$inhandle=qa_get('u');
+	$loginuserid=qa_get_logged_in_userid();
 	$useremailed=false;
 	$userconfirmed=false;
 	
-	if (isset($qa_login_userid) && qa_clicked('dosendconfirm')) { // button clicked to send a link
+	if (isset($loginuserid) && qa_clicked('dosendconfirm')) { // button clicked to send a link
 		require_once QA_INCLUDE_DIR.'qa-app-users-edit.php';
 		
-		qa_send_new_confirm($qa_login_userid);
+		qa_send_new_confirm($loginuserid);
 		$useremailed=true;
 	
 	} elseif (strlen($incode)) { // non-empty code detected from the URL
@@ -69,11 +63,12 @@
 			}
 		}
 		
-		if ((!$userconfirmed) && isset($qa_login_userid)) { // as a backup, also match code on URL against logged in user
-			$userinfo=qa_db_select_with_pending(qa_db_user_account_selectspec($qa_login_userid, true));
+		if ((!$userconfirmed) && isset($loginuserid)) { // as a backup, also match code on URL against logged in user
+			$userinfo=qa_db_select_with_pending(qa_db_user_account_selectspec($loginuserid, true));
+			$flags=$userinfo['flags'];
 			
-			if ($userinfo['flags'] & QA_USER_FLAGS_EMAIL_CONFIRMED) // if they confirmed before, just show message as if it happened now
-				$userconfirmed=true;
+			if ( ($flags & QA_USER_FLAGS_EMAIL_CONFIRMED) && !($flags & QA_USER_FLAGS_MUST_CONFIRM) )
+				$userconfirmed=true; // if they confirmed before, just show message as if it happened now
 			
 			elseif (strtolower(trim($userinfo['emailcode']))==strtolower($incode)) {
 				qa_complete_confirm($userinfo['userid'], $userinfo['email'], $userinfo['handle']);
@@ -95,7 +90,7 @@
 	elseif ($userconfirmed) {
 		$qa_content['error']=qa_lang_html('users/confirm_complete');
 		
-		if (!isset($qa_login_userid))
+		if (!isset($loginuserid))
 			$qa_content['suggest_next']=strtr(
 				qa_lang_html('users/log_in_to_access'),
 				
@@ -105,17 +100,7 @@
 				)
 			);
 
-		elseif ($qa_login_userid == $userinfo['userid'])
-			$qa_content['suggest_next']=strtr(
-				qa_lang_html('users/view_account_page'),
-				
-				array(
-					'^1' => '<A HREF="'.qa_path_html('account').'">',
-					'^2' => '</A>',
-				)
-			);
-
-	} elseif (isset($qa_login_userid)) { // if logged in, allow sending a fresh link
+	} elseif (isset($loginuserid)) { // if logged in, allow sending a fresh link
 		if (strlen($incode))
 			$qa_content['error']=qa_lang_html('users/confirm_wrong_resend');
 
@@ -127,7 +112,10 @@
 			'fields' => array(
 				'email' => array(
 					'label' => qa_lang_html('users/email_label'),
-					'value' => qa_html(qa_get_logged_in_email()),
+					'value' => qa_html(qa_get_logged_in_email()).strtr(qa_lang_html('users/change_email_link'), array(
+						'^1' => '<A HREF="'.qa_path_html('account').'">',
+						'^2' => '</A>',
+					)),
 					'type' => 'static',
 				),
 			),

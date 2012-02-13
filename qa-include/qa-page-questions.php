@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-questions.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for page listing recent questions
 
 
@@ -33,40 +32,45 @@
 	require_once QA_INCLUDE_DIR.'qa-db-selects.php';
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
 	require_once QA_INCLUDE_DIR.'qa-app-q-list.php';
+	require_once QA_INCLUDE_DIR.'qa-app-updates.php';
 	
-	$categoryslugs=$pass_subrequests;
+	$categoryslugs=qa_request_parts(1);
 	$countslugs=count($categoryslugs);
-	$sort=$countslugs ? null : qa_get('sort');
+	
+	$sort=($countslugs && !QA_ALLOW_UNINDEXED_QUERIES) ? null : qa_get('sort');
+	$start=qa_get_start();
+	$userid=qa_get_logged_in_userid();
 
 
 //	Get list of questions, plus category information
 
 	switch ($sort) {
 		case 'hot':
-			$questionselect=qa_db_qs_selectspec($qa_login_userid, 'hotness', $qa_start);
+			$selectsort='hotness';
 			break;
 		
 		case 'votes':
-			$questionselect=qa_db_qs_selectspec($qa_login_userid, 'netvotes', $qa_start);
+			$selectsort='netvotes';
 			break;
 			
 		case 'answers':
-			$questionselect=qa_db_qs_selectspec($qa_login_userid, 'acount', $qa_start);
+			$selectsort='acount';
 			break;
 			
 		case 'views':
-			$questionselect=qa_db_qs_selectspec($qa_login_userid, 'views', $qa_start);
+			$selectsort='views';
 			break;
 		
 		default:
-			$questionselect=qa_db_qs_selectspec($qa_login_userid, 'created', $qa_start, $categoryslugs);
+			$selectsort='created';
 			break;
 	}
 	
-	@list($questions, $categories, $categoryid)=qa_db_select_with_pending(
-		$questionselect,
-		qa_db_category_nav_selectspec($categoryslugs, false),
-		$countslugs ? qa_db_slugs_to_category_id_selectspec($categoryslugs) : null
+	@list($questions, $categories, $categoryid, $favorite)=qa_db_select_with_pending(
+		qa_db_qs_selectspec($userid, $selectsort, $start, $categoryslugs, null, false, false, qa_opt_if_loaded('page_size_qs')),
+		qa_db_category_nav_selectspec($categoryslugs, false, false, true),
+		$countslugs ? qa_db_slugs_to_category_id_selectspec($categoryslugs) : null,
+		($countslugs && isset($userid)) ? qa_db_is_favorite_selectspec($userid, QA_ENTITY_CATEGORY, $categoryslugs) : null
 	);
 	
 	if ($countslugs) {
@@ -79,29 +83,31 @@
 	} else
 		$nonetitle=qa_lang_html('main/no_questions_found');
 	
-	$categorypathprefix=null; // only show category list and feed when sorting by date
+
+	$categorypathprefix=QA_ALLOW_UNINDEXED_QUERIES ? 'questions/' : null; // this default is applied if sorted not by recent
 	$feedpathprefix=null;
-	$pagelinkparams=array('sort' => $sort);
+	$linkparams=array('sort' => $sort);
 	
 	switch ($sort) {
 		case 'hot':
-			$sometitle=qa_lang_html('main/hot_qs_title');
+			$sometitle=$countslugs ? qa_lang_html_sub('main/hot_qs_in_x', $categorytitlehtml) : qa_lang_html('main/hot_qs_title');
+			$feedpathprefix=qa_opt('feed_for_hot') ? 'hot' : null;
 			break;
 			
 		case 'votes':
-			$sometitle=qa_lang_html('main/voted_qs_title');
+			$sometitle=$countslugs ? qa_lang_html_sub('main/voted_qs_in_x', $categorytitlehtml) : qa_lang_html('main/voted_qs_title');
 			break;
 			
 		case 'answers':
-			$sometitle=qa_lang_html('main/answered_qs_title');
+			$sometitle=$countslugs ? qa_lang_html_sub('main/answered_qs_in_x', $categorytitlehtml) : qa_lang_html('main/answered_qs_title');
 			break;
 		
 		case 'views':
-			$sometitle=qa_lang_html('main/viewed_qs_title');
+			$sometitle=$countslugs ? qa_lang_html_sub('main/viewed_qs_in_x', $categorytitlehtml) : qa_lang_html('main/viewed_qs_title');
 			break;
 		
 		default:
-			$pagelinkparams=array();
+			$linkparams=array();
 			$sometitle=$countslugs ? qa_lang_html_sub('main/recent_qs_in_x', $categorytitlehtml) : qa_lang_html('main/recent_qs_title');
 			$categorypathprefix='questions/';
 			$feedpathprefix=qa_opt('feed_for_questions') ? 'questions' : null;
@@ -112,13 +118,25 @@
 //	Prepare and return content for theme
 
 	$qa_content=qa_q_list_page_content(
-		$questions, qa_opt('page_size_qs'), $qa_start, $countslugs ? $categories[$categoryid]['qcount'] : qa_opt('cache_qcount'), $sometitle, $nonetitle,
-		$categories, $categoryid, true, $categorypathprefix, $feedpathprefix,
-		$countslugs ? qa_html_suggest_qs_tags(qa_using_tags()) : qa_html_suggest_ask($categoryid), $pagelinkparams
+		$questions, // questions
+		qa_opt('page_size_qs'), // questions per page
+		$start, // start offset
+		$countslugs ? $categories[$categoryid]['qcount'] : qa_opt('cache_qcount'), // total count
+		$sometitle, // title if some questions
+		$nonetitle, // title if no questions
+		$categories, // categories for navigation
+		$categoryid, // selected category id
+		true, // show question counts in category navigation
+		$categorypathprefix, // prefix for links in category navigation
+		$feedpathprefix, // prefix for RSS feed paths
+		$countslugs ? qa_html_suggest_qs_tags(qa_using_tags()) : qa_html_suggest_ask($categoryid), // suggest what to do next
+		$linkparams, // extra parameters for page links
+		$linkparams, // category nav params
+		$favorite // has used favorited this category
 	);
 	
-	if (!$countslugs)
-		$qa_content['navigation']['sub']=qa_qs_sub_navigation($sort);
+	if (QA_ALLOW_UNINDEXED_QUERIES || !$countslugs)
+		$qa_content['navigation']['sub']=qa_qs_sub_navigation($sort, $categoryslugs);
 
 	
 	return $qa_content;

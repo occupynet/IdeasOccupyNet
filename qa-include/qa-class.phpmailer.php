@@ -510,7 +510,7 @@ class PHPMailer {
    * @return bool
    */
   function SmtpSend($header, $body) {
-    include_once($this->PluginDir . 'class.smtp.php');
+    include_once($this->PluginDir . 'qa-class.smtp.php'); // Question2Answer mod: changed file name
     $error = '';
     $bad_rcpt = array();
 
@@ -589,7 +589,7 @@ class PHPMailer {
     /* Retry while there is no connection */
     while($index < count($hosts) && $connection == false) {
       $hostinfo = array();
-      if(eregi('^(.+):([0-9]+)$', $hosts[$index], $hostinfo)) {
+      if(false /*eregi('^(.+):([0-9]+)$', $hosts[$index], $hostinfo)*/) { // Question2Answer mod: removed eregi due to deprecation
         $host = $hostinfo[1];
         $port = $hostinfo[2];
       } else {

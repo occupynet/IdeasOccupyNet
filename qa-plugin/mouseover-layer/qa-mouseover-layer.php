@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-plugin/mouseover-layer/qa-mouseover-layer.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Theme layer class for mouseover layer plugin
 
 
@@ -35,32 +34,39 @@
 	
 				$postids=array();
 				foreach ($q_list['qs'] as $question)
-					$postids[]=$question['raw']['postid'];
+					if (isset($question['raw']['postid']))
+						$postids[]=$question['raw']['postid'];
+				
+				if (count($postids)) {
+
+				//	Retrieve the content for these questions from the database and put into an array
+				
+					$result=qa_db_query_sub('SELECT postid, content, format FROM ^posts WHERE postid IN (#)', $postids);
+					$postinfo=qa_db_read_all_assoc($result, 'postid');
 					
-			//	Retrieve the content for these questions from the database and put into an array
-			
-				$result=qa_db_query_sub('SELECT postid, BINARY content AS content, format FROM ^posts WHERE postid IN (#)', $postids);
-				$postinfo=qa_db_read_all_assoc($result, 'postid');
-				
-			//	Get the regular expression fragment to use for blocked words and the maximum length of content to show
-				
-				$blockwordspreg=qa_get_block_words_preg();
-				$maxlength=qa_opt('mouseover_content_max_len');
-				
-			//	Now add the popup to the title for each question
-	
-				foreach ($q_list['qs'] as $index => $question) {
-					$thispost=$postinfo[$question['raw']['postid']];
-					$text=qa_viewer_text($thispost['content'], $thispost['format'], array('blockwordspreg' => $blockwordspreg));
-					$text=qa_shorten_string_line($text, $maxlength);
-					$q_list['qs'][$index]['title']='<SPAN TITLE="'.qa_html($text).'">'.$question['title'].'</SPAN>';
+				//	Get the regular expression fragment to use for blocked words and the maximum length of content to show
+					
+					$blockwordspreg=qa_get_block_words_preg();
+					$maxlength=qa_opt('mouseover_content_max_len');
+					
+				//	Now add the popup to the title for each question
+		
+					foreach ($q_list['qs'] as $index => $question) {
+						$thispost=@$postinfo[$question['raw']['postid']];
+						
+						if (isset($thispost)) {
+							$text=qa_viewer_text($thispost['content'], $thispost['format'], array('blockwordspreg' => $blockwordspreg));
+							$text=qa_shorten_string_line($text, $maxlength);
+							$q_list['qs'][$index]['title']='<SPAN TITLE="'.qa_html($text).'">'.@$question['title'].'</SPAN>';
+						}
+					}
 				}
 			}
 			
 			qa_html_theme_base::q_list($q_list); // call back through to the default function
 		}
 
-	};
+	}
 	
 
 /*

@@ -1,14 +1,13 @@
 <?php
 
 /*
-	Question2Answer 1.4 (c) 2011, Gideon Greenspan
+	Question2Answer (c) Gideon Greenspan
 
 	http://www.question2answer.org/
 
 	
 	File: qa-include/qa-page-not-found.php
-	Version: 1.4
-	Date: 2011-06-13 06:42:43 GMT
+	Version: See define()s at top of qa-include/qa-base.php
 	Description: Controller for page not found (error 404)
 
 
@@ -32,16 +31,15 @@
 	
 	require_once QA_INCLUDE_DIR.'qa-app-format.php';
 
-	
-	header('HTTP/1.0 404 Not Found');
-	$qa_template='not-found';
 
-	
-//	Prepare content for theme
+	header('HTTP/1.0 404 Not Found');
+
+	qa_set_template('not-found');
 
 	$qa_content=qa_content_prepare();
 	$qa_content['error']=qa_lang_html('main/page_not_found');
 	$qa_content['suggest_next']=qa_html_suggest_qs_tags(qa_using_tags());
+	
 	
 	return $qa_content;
 
