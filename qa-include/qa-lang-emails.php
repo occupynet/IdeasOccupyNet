@@ -47,7 +47,7 @@
 		'private_message_reply' => "Click below to reply to ^f_handle by private message:\n\n^url\n\n",
 		'private_message_subject' => 'Message from ^f_handle on ^site_title',
 		'q_answered_body' => "Your question on ^site_title has been answered by ^a_handle:\n\n^open^a_content^close\n\nYour question was:\n\n^open^q_title^close\n\nIf you like this answer, you may select it as the best:\n\n^url\n\nThank you,\n\n^site_title",
-		'q_answered_subject' => 'Your ^site_title question ^open^q_title^close was answered by ^f_handle',
+		'q_answered_subject' => 'Your ^site_title question ^open^q_title^close was answered',
 		'q_commented_body' => "Your question on ^site_title has a new comment by ^c_handle:\n\n^open^c_content^close\n\nYour question was:\n\n^open^c_context^close\n\nYou may respond by adding your own comment:\n\n^url\n\nThank you,\n\n^site_title",
 		'q_commented_subject' => 'Your ^site_title question has a new comment',
 		'q_posted_body' => "A new question has been asked by ^q_handle:\n\n^open^q_title\n\n^q_content^close\n\nClick below to see the question:\n\n^url\n\nThank you,\n\n^site_title",
