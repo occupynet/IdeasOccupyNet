@@ -1,4 +1,14 @@
-
+/*fonts*/
+@font-face {
+    font-family: 'OSPDIN';
+    src: url('/qa-theme/Quixote/fonts/osp-din-webfont.eot');
+    src: url('/qa-theme/Quixote/fonts/osp-din-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/qa-theme/Quixote/fonts/osp-din-webfont.woff') format('woff'),
+         url('/qa-theme/Quixote/fonts/osp-din-webfont.ttf') format('truetype'),
+         url('/qa-theme/Quixote/fonts/osp-din-webfont.svg#OSPDIN') format('svg');
+    font-weight: normal;
+    font-style: normal;
+}
 /* General page layout */
 
 html { background: #ccc}
@@ -54,7 +64,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-template-admin .qa-main h2 {color:#000; font-size: 16px; background: url("imgs/bg-module.jpg") repeat scroll left top #FFFFFF; border-bottom: 1px dashed #999999; margin: 0; padding: 10px 0 15px 30px;}
 .qa-template-account .qa-main h2 {color:#000; font-size: 16px; background: url("imgs/bg-module.jpg") repeat scroll left top #FFFFFF; margin: 0; padding: 0 0 15px 30px;}
 
-.qa-error { color:#D85D30; font-size:14px; padding:10px; background: #FFFF33; text-align: center;}
+.qa-error { color:#D85D30; font-size:14px; padding:10px; background: #fc0; text-align: center;}
 	.qa-error a {color:#ca4615; font-weight: bold;}
 	.qa-error a:hover {text-decoration:underline;}
 .qa-template-qa .qa-error, .qa-q-list .qa-error, .qa-template-confirm .qa-error, .qa-template-ask .qa-error { margin:15px 0; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px;}
@@ -100,8 +110,11 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 /* Header sections */
 
-.qa-logo {float:left; margin-bottom:25px; margin-top:5px; margin-left: 13px; padding-top:27px; font-size:24px; line-height:48px; font-weight:bold; color:#333;}
-.qa-logo-link, .qa-logo-link:hover {color:#333;}
+.qa-logo {float:left; margin-bottom:25px; margin-top:5px; margin-left: 13px; padding-top:27px; font-size:38px; text-transform: uppercase; line-height:48px; font-weight:normal; color:#fc0; font-family:OSPDIN,sans-serif;
+  text-shadow: 2px 2px 2px #333;
+ 
+  }
+.qa-logo-link, .qa-logo-link:hover {color:#fc0;  font-family: OSPDIN,sans-serif}
 
 .qa-search {float:right; white-space:nowrap; margin-top: 17px; margin-right: 13px;}
 * html .qa-search {margin-right:6px;} /* IE6 */
@@ -132,15 +145,15 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-nav-main-ask a { background: url(imgs/icon-ask.png) 6px 4px no-repeat scroll; padding-left: 32px;}
 .qa-nav-main-item-opp {float:right; padding-right:10px;}
 .qa-nav-main-link { color:#fff!important; text-transform: uppercase; text-decoration:none; display:block; margin: 6px 2px; padding:4px 15px; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px;}
-.qa-nav-main-link:hover,.qa-nav-main-selected { background-color: #262626; color:#ffff33!important; text-decoration:none;}
+.qa-nav-main-link:hover,.qa-nav-main-selected { background-color: #262626; color:#fc0!important; text-decoration:none;}
 
 .qa-nav-sub {clear:both; margin-top: 10px;}
 * html .qa-nav-sub {background:none;} /* IE6 since z-order goes wrong */
 .qa-nav-sub-list {font-size:12px; list-style:none; padding:0; margin:0;}
 .qa-nav-sub-item {float:left;}
 .qa-nav-sub-link {color:#fff; text-transform: uppercase; text-decoration:none; display:block; margin: 6px 2px 0 2px; padding:4px 15px; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; background-color: rgba(0,0,0,0.2); font-size: 10px;}
-.qa-nav-sub-link:hover { color:#ffff33; background-color: rgba(0,0,0,0.5); text-decoration: none;}
-.qa-nav-sub-selected { background-color: #000; color:#ffff33; text-decoration: none;}
+.qa-nav-sub-link:hover { color:#fc0; background-color: rgba(0,0,0,0.5); text-decoration: none;}
+.qa-nav-sub-selected { background-color: #000; color:#fc0; text-decoration: none;}
 
 .qa-nav-cat { background: #FFF url(imgs/bg-module.jpg) top left repeat scroll; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; border: #9d9937 solid 4px; overflow: hidden;}
 .qa-nav-cat-list {font-size:18px !important; list-style:none; padding:0; margin:0; color: #666; font-weight: bold;}
@@ -169,10 +182,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-page-link,.qa-page-selected,.qa-page-prev,.qa-page-next,.qa-page-ellipsis {display:block; padding:10px 0;}
 .qa-page-link,.qa-page-selected,.qa-page-ellipsis {width:40px;}
 .qa-page-link {color:#fff; background-color: rgba(0,0,0,0.2);}
-.qa-page-selected {color:#FFFF33; background-color: rgba(0,0,0,0.75);}
+.qa-page-selected {color:#fc0; background-color: rgba(0,0,0,0.75);}
 .qa-page-prev,.qa-page-next {color:#333; background: rgba(0,0,0,0.2); width:60px; width: 80px;}
 .qa-page-ellipsis {color:#000;}
-.qa-page-link:hover,.qa-page-prev:hover,.qa-page-next:hover {text-decoration:none; background-color: rgba(0,0,0,0.5); color:#FFFF33;}
+.qa-page-link:hover,.qa-page-prev:hover,.qa-page-next:hover {text-decoration:none; background-color: rgba(0,0,0,0.5); color:#fc0;}
 
 /* Standard form (tall version) */
 .qa-template-reset .qa-main form, .qa-template-login .qa-main form, .qa-template-confirm .qa-main form, .qa-template-admin .qa-main form, .qa-template-ask .qa-main form, .qa-template-register .qa-main form, .qa-template-forgot .qa-main form, .qa-template-message .qa-main form { -webkit-border-bottom-right-radius: 8px; -webkit-border-bottom-left-radius: 8px; -moz-border-radius-bottomright: 8px; -moz-border-radius-bottomleft: 8px; border-bottom-right-radius: 8px; border-bottom-left-radius: 8px; padding-bottom: 5px; background: url("imgs/bg-module.jpg") repeat scroll left top #FFFFFF;}
@@ -266,7 +279,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-q-item-tag-item {display:inline;}
 
 .qa-suggest-next {background:rgba(0,0,0,0.25); color:#fff; font-size:14px; padding:8px; text-align:center; clear:both; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; margin-top: 15px;}
-	.qa-suggest-next a {color:#FFFF33; font-weight: bold;}
+	.qa-suggest-next a {color:#fc0; font-weight: bold;}
 	.qa-suggest-next a:hover {text-decoration:underline;}
 	.qa-suggest-next:hover {background:rgba(0,0,0,0.75);}
 
@@ -274,7 +287,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 /* qa-*-hover classes are substituted by JS (for IE), qa-*-button:hover is a backup for other browsers if JS is off */
 
-.qa-voting {float:left; width:88px; height: 108px; margin-right:4px; -webkit-border-radius: 6px; -moz-border-radius: 6px; border-radius: 6px; overflow: hidden; background: #ffff33 url(imgs/bg-votes.png) left 4px repeat-x scroll;}
+.qa-voting {float:left; width:88px; height: 108px; margin-right:4px; -webkit-border-radius: 6px; -moz-border-radius: 6px; border-radius: 6px; overflow: hidden; background: #fc0 url(imgs/bg-votes.png) left 4px repeat-x scroll;}
 
 .qa-vote-buttons {position:relative; height:40px; width:90px;}
 
@@ -323,11 +336,11 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 /* Top tags and users tables */
 
 .qa-top-tags-table {float:left; margin:0 0 10px 15px; font-size: 12px; border-collapse:collapse;}
-.qa-top-tags-count {border-right:1px dashed #b4ae3e; color:#ffff33; text-align:right; padding:0 8px 3px 12px; background: url(imgs/bg-tags-count.png) top left no-repeat scroll;}
+.qa-top-tags-count {border-right:1px dashed #b4ae3e; color:#fc0; text-align:right; padding:0 8px 3px 12px; background: url(imgs/bg-tags-count.png) top left no-repeat scroll;}
 .qa-top-tags-label {background: url(imgs/bg-tags-label.png) top right no-repeat scroll; padding:8px 30px 5px 8px;}
 	.qa-top-tags-label .qa-tag-link {font-weight:normal; color: #FFF!important;}
 .qa-top-tags-spacer {padding:0 4px;}
-.qa-template-categories .qa-top-tags-count {border-right:0; color:#ffff33; background: url(imgs/bg-categories-count.png) top left no-repeat scroll; text-align:right; padding:0 8px 3px 12px;}
+.qa-template-categories .qa-top-tags-count {border-right:0; color:#fc0; background: url(imgs/bg-categories-count.png) top left no-repeat scroll; text-align:right; padding:0 8px 3px 12px;}
 .qa-template-categories .qa-top-tags-label {background: url(imgs/bg-categories-label.png) top right no-repeat scroll; padding:4px 20px 7px 0;}
 .qa-template-categories .qa-category-link { color: #FFF;}
 
@@ -348,7 +361,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-q-view-meta a, .qa-q-view-meta a:hover, .qa-q-view-meta a:active, .qa-q-view-meta a:visited { color: #000!important;}
 .qa-q-view-main h2 { background:rgba(0,0,0,0.4); color:#fff; font-size:14px; padding:8px; text-align:center; clear:both; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; margin-top: 15px; font-family: Arial, Helvetica, sans-serif;}
 .qa-q-view-main h2:hover {background:rgba(0,0,0,0.75);}
-.qa-q-view-main h2 a { color: #FFFF33; font-weight: bold;}
+.qa-q-view-main h2 a { color: #fc0; font-weight: bold;}
 .qa-q-view-follows {font-size:12px; margin-bottom:16px; padding: 5px 21px; background: rgba(0,0,0,0.1); -webkit-border-radius: 6px; -moz-border-radius: 6px; border-radius: 6px; color: #666;}
 .qa-q-view-follows-link { display: block; color: #9CB43E; font-weight: bold; margin-top: 4px;}
 .qa-q-view-when-data {font-weight:bold;}

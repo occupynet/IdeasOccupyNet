@@ -55,7 +55,7 @@
                         $share_facebook = $fb_meta."
                         <li><a href=\"http://www.facebook.com/sharer.php?u=".$question_url."\" target=\"_blank\" class=\"sharefacebook\" title=\"Share on Facebook\">Share on Facebook</a></li>";
                         
-                        $share_twitter = "<li><a href=\"http://twitter.com/share?text=".addslashes(strip_tags($q_view["title"]))." %20%23occupyideas%20&url=".$question_url."\" target=\"_blank\" class=\"sharetwitter\" title=\"Share on Twitter\">Share on Twitter</a></li>";
+                        $share_twitter = "<li><a href=\"http://twitter.com/share?text=".addslashes(strip_tags($q_view["title"]))." %20%23occupyideas%20%23ows%20&url=".$question_url."\" target=\"_blank\" class=\"sharetwitter\" title=\"Share on Twitter\">Share on Twitter</a></li>";
 
                         $this->output(
                           '<DIV class="sociable">',
