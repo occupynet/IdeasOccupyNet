@@ -98,7 +98,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 /* Header sections */
 
-.qa-logo {float:left; margin-bottom:12px; margin-left: 13px; padding-top:27px; font-size:48px; font-weight:bold; color:#6a1b56;}
+.qa-logo {float:left; margin-bottom:25px; margin-top:5px; margin-left: 13px; padding-top:27px; font-size:48px; font-weight:bold; color:#6a1b56;}
 .qa-logo-link, .qa-logo-link:hover {color:#6a1b56;}
 
 .qa-search {float:right; white-space:nowrap; margin-top: 17px; margin-right: 13px;}

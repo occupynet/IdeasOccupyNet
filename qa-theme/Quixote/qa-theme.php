@@ -57,17 +57,21 @@
                 }
 
                 function main()
-                {
+                                     {
                         $content=$this->content;
-                        if(strpos($content['script_var']['qa_request'],'user') >= 0){
-                         $extraclass = $content['form_profile']['fields']['level']['value'];
-                         if(strpos($extraclass,'<A') >= 0){
-                           $extraclass = " qa-main-".str_replace(' ','-',substr($extraclass,0,strpos($extraclass,'<A') - 3));
-                         }else{
-                           $extraclass = " qa-main-".str_replace(' ','-',$extraclass);
-                         }  
-                        }else
+                         
+                        // Adding class role if user page(user/%user%)
+                        if(strpos($content['script_var']['qa_request'],'user/') === false)
                           $extraclass="";
+                        else{
+                          $extraclass = $content['form_profile']['fields']['level']['value'];                         
+                          if(strpos($extraclass,'<A') === false){
+                           $extraclass = " qa-main-".str_replace(' ','-',$extraclass);
+                          }else{
+                           $extraclass = " qa-main-".str_replace(' ','-',substr($extraclass,0,strpos($extraclass,'<A') - 3));
+                          }
+                        }
+
 
                         $this->output('<DIV CLASS="qa-main'.$extraclass.(@$this->content['hidden'] ? ' qa-main-hidden' : '').'">');
 
@@ -98,6 +102,7 @@
            
                 function q_list_item($question)
                 {
+                        // Adding class role
                         $this->output('<DIV CLASS="qa-q-list-item qa-q-list-item-'.str_replace(' ','-',@$question['who']['level']).rtrim(' '.@$question['classes']).'" '.@$question['tags'].'>');
 
                         $this->q_item_stats($question);
@@ -119,6 +124,7 @@
 
                 function q_view_main($q_view)
                 {
+                        // Adding class role
                         $this->output('<DIV CLASS="qa-q-view-main qa-q-view-main-'.str_replace(' ','-',@$q_view['who']['level']).'">');
 
                         $this->q_view_content($q_view);
@@ -137,6 +143,7 @@
 
                 function a_list_item($a_item)
                 {
+                        // Adding class role
                         $extraclass=@$a_item['classes'].($a_item['hidden'] ? ' qa-a-list-item-hidden' : ($a_item['selected'] ? ' qa-a-list-item-selected' : ''));
 
                         $this->output('<DIV CLASS="qa-a-list-item qa-a-list-item-'.str_replace(' ','-',@$a_item['who']['level'])." ".$extraclass.'" '.@$a_item['tags'].'>');
@@ -150,6 +157,7 @@
 
                 function c_list_item($c_item)
                 {
+                        // Adding class role
                         $extraclass=@$c_item['classes'].($c_item['hidden'] ? ' qa-c-item-hidden' : '');
 
                         $this->output('<DIV CLASS="qa-c-list-item qa-c-list-item-'.str_replace(' ','-',@$c_item['who']['level'])." ".$extraclass.'" '.@$c_item['tags'].'>');
