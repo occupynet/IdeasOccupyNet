@@ -99,7 +99,6 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .groups h2 { margin: 0 0 5px 0; font-size: 16px; padding-top: 0; color: #8d8d81;}
 .groups h2.linetop { background: url("http://propongo.tomalaplaza.net/qa-theme/Quixote/imgs/asset-bisel.png") repeat-x scroll top left transparent; margin: 10px 0 0 0; padding: 5px 0;}
 
-
 .qa-feed {background:url(imgs/icon-rss.png) no-repeat top left; padding-left:22px; margin:15px 4px 15px 10px; height: 17px;}
 .qa-feed-link {font-size:12px; color:#000;}
 .qa-main {float:left; width:735px; margin-bottom:20px; min-height: 599px;}
@@ -536,3 +535,7 @@ div.qa-widget-side  {
 
 div.qa-widget-side .qa-nav-cat-list.qa-nav-cat-link {font-size: 24px; color:#000; background: #fff; margin: 0; padding: 0px; margin-bottom:8px; padding-bottom:16px}
 
+div.qa-widget-side a{
+  color:#335D99;
+
+}
