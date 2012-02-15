@@ -1,7 +1,7 @@
 
 /* General page layout */
 
-html { background: #bfb942 top left url(imgs/bg-texture.jpg) repeat scroll;}
+html { background: #ccc}
 body {background: url(imgs/bg-header.png) repeat-x left top; margin:0; padding:0; text-align:center;}
 body,td,input,textarea {font-size:12px; font-family: Arial, Helvetica, sans-serif;}
 a:link,a:active,a:visited {text-decoration:none;/* outline:none;*/}
@@ -61,8 +61,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 /* Page sections */
 
-.qa-header {position:relative; background: url(imgs/bg-topbox.png) no-repeat top right scroll;}
-.qa-sidepanel {float:right; width:227px; margin-bottom: 15px;}
+.qa-header {position:relative; 
+  background: url(imgs/bg-topbox.png) no-repeat top right scroll;
+  margin-top:-32px;}
+.qa-sidepanel {float:right; width:227px; margin-bottom: 15px; padding-top:16px;}
 .qa-sidebar .badge { margin:15px 0 10px 0; border: 4px solid #9D9937; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; overflow: hidden;}
 
 /* Arreglos sidebar modules */
@@ -98,8 +100,8 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 /* Header sections */
 
-.qa-logo {float:left; margin-bottom:25px; margin-top:5px; margin-left: 13px; padding-top:27px; font-size:48px; font-weight:bold; color:#6a1b56;}
-.qa-logo-link, .qa-logo-link:hover {color:#6a1b56;}
+.qa-logo {float:left; margin-bottom:25px; margin-top:5px; margin-left: 13px; padding-top:27px; font-size:24px; line-height:48px; font-weight:bold; color:#333;}
+.qa-logo-link, .qa-logo-link:hover {color:#333;}
 
 .qa-search {float:right; white-space:nowrap; margin-top: 17px; margin-right: 13px;}
 * html .qa-search {margin-right:6px;} /* IE6 */
@@ -141,12 +143,12 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-nav-sub-selected { background-color: #000; color:#ffff33; text-decoration: none;}
 
 .qa-nav-cat { background: #FFF url(imgs/bg-module.jpg) top left repeat scroll; -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px; border: #9d9937 solid 4px; overflow: hidden;}
-.qa-nav-cat-list {font-size:12px; list-style:none; padding:0; margin:0; color: #666; font-weight: bold;}
+.qa-nav-cat-list {font-size:18px !important; list-style:none; padding:0; margin:0; color: #666; font-weight: bold;}
 .qa-nav-cat-list .qa-nav-cat-list .qa-nav-cat-list { border-left: dashed 1px #CCC;}
 .qa-nav-cat-item {margin:8px 0 8px 8px;}
-.qa-nav-cat-link {font-weight: normal; color: #000;}
+.qa-nav-cat-link {font-weight: normal; color: #000; margin-bottom:10px;}
 .qa-nav-cat-selected,.qa-nav-cat-selected:hover {text-decoration:none; color:#000;}
-.qa-nav-cat-all { font-size: 11px; color:#FFF; background: #000; margin: 0; padding: 8px; -webkit-border-top-left-radius: 4px; -webkit-border-top-right-radius: 4px; -moz-border-radius-topleft: 4px; -moz-border-radius-topright: 4px; border-top-left-radius: 4px; border-top-right-radius: 4px;}
+.qa-nav-cat-all { font-size: 18px !important; color:#FFF; background: #000; margin: 0; padding: 8px; -webkit-border-top-left-radius: 4px; -webkit-border-top-right-radius: 4px; -moz-border-radius-topleft: 4px; -moz-border-radius-topright: 4px; border-top-left-radius: 4px; border-top-right-radius: 4px;}
 .qa-nav-cat-all a{ color:#FFF; font-weight: normal;}
 .qa-nav-cat-all a:hover{ text-decoration: underline; color:#FFF;}
 
@@ -330,10 +332,10 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 .qa-template-categories .qa-category-link { color: #FFF;}
 
 .qa-top-users-table {float:left; border-collapse:collapse; margin-bottom:1em;}
-.qa-top-users-label {border:1px solid #C0B600; border-right:1px dashed #c1c5a9; padding:6px 16px 6px 12px; text-align:left;}
-.qa-top-users-score {background:#ffffe6; border-color:#C0B600; border-style:solid solid solid none; border-width:1px; color:#8D006A; padding:6px 12px; text-align:right;}
+.qa-top-users-label {border:1px dashed #fff; border-right:1px dashed #fff; padding:6px 16px 6px 12px; text-align:left;}
+.qa-top-users-score {background:#ffffe6; border-color:#fff; border-style:dashed dashed dashed none; border-width:1px; color:#8D006A; padding:12px 24px; text-align:right;}
 .qa-top-users-spacer {padding:0 4px;}
-
+.qa-top-users-table td { background:#e0e0e0; font-size:18px;}
 /* Question view */
 
 .qa-template-question h1 { border-bottom: dashed 1px #999; margin: 0; padding: 18px 20px 18px 30px; background: url("imgs/bg-module.jpg") repeat scroll left top #FFFFFF; margin-top: 16px; border-top-left-radius: 8px; border-top-right-radius: 8px;}
@@ -505,3 +507,19 @@ h2 { color: #cccccc; font-size: 14px; font-family: 'Amaranth', arial, serif; fon
 * html .qa-voted-down-hover {background:url(vote-buttons-ie6.png) no-repeat -27px -29px;}
 * html .qa-tag-link {background:url(tag-icon-ie6.png) no-repeat left center;}
 * html .qa-a-count {background:url(a-count-icon-ie6.png) no-repeat 32px 13px;}
+
+div.qa-widgets-side .widget-side-top {
+ background:#fff;
+}
+
+div.qa-widget-side  {
+ background:#fff;
+ padding:8px;
+ padding-bottom:16px;
+ -webkit-border-radius: 8px; -moz-border-radius: 8px; border-radius: 8px;
+ margin-bottom:16px;
+}
+
+
+div.qa-widget-side .qa-nav-cat-list.qa-nav-cat-link {font-size: 24px; color:#000; background: #fff; margin: 0; padding: 0px; margin-bottom:8px; padding-bottom:16px}
+

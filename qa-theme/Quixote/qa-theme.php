@@ -35,6 +35,7 @@
 
                 function q_view_content($q_view)
                 {
+                  
                         if (!empty($q_view['content']))
                                 $this->output(
                                         '<DIV CLASS="qa-q-view-content">',
@@ -44,13 +45,21 @@
 
                         // Sociable
                         $question_url = str_replace("..","","http://".$_SERVER['SERVER_NAME'].$q_view['url']);
-                        $share_facebook = "<li><a href=\"http://www.facebook.com/sharer.php?u=".$question_url."\" target=\"_blank\" class=\"sharefacebook\" title=\"Compartir en Facebook\">Compartir en Facebook</a></li>";
-                        $share_twitter = "<li><a href=\"http://twitter.com/share?text=#propongo%20&url=".$question_url."\" target=\"_blank\" class=\"sharetwitter\" title=\"Compartir en Twitter\">Compartir en Twitter</a></li>";
-                        $share_meneame = "<li><a href=\"http://meneame.net/submit.php?url='".$question_url."'\" target=\"_blank\" class=\"sharemeneame\" title=\"Compartir en Meneame\">Compartir en Meneame</a></li>";
+                        $question_text = 
+                        $fb_meta = '  <meta property="og:title" content="'.$q_view["title"].'"/>
+                          <meta property="og:site_name" content="Occupy Ideas"/>
+                          <meta property="og:url" content="'.$question_url.'"/>
+                          <meta property="og:image" content="http://occupywallstreet.net/bloombergbucks/images/bloombuck.png"/>
+                          <meta property="og:description" content="'.addslashes($q_view["content"]).'"/>';
+                          
+                        $share_facebook = $fb_meta ."
+                        <li><a href=\"http://www.facebook.com/sharer.php?u=".$question_url."\" target=\"_blank\" class=\"sharefacebook\" title=\"Share on Facebook\">Share on Facebook</a></li>";
+                        $share_twitter = "<li><a href=\"http://twitter.com/share?text=".$q_view["title"]." %20%23occupyideas%20&url=".$question_url."\" target=\"_blank\" class=\"sharetwitter\" title=\"Share on Twitter\">Share on Twitter</a></li>";
+                       
                         $this->output(
                           '<DIV class="sociable">',
                             '<UL>',
-                            $share_facebook." ".$share_twitter." ".$share_meneame,
+                            $share_facebook." ".$share_twitter,
                             '</UL>',
 		          '</DIV><br />' 
                         );
