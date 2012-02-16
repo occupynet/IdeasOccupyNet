@@ -345,7 +345,7 @@ h2 {font-size:22px; color:#c659ab; padding-top:12px; clear:both;}
 
 .qa-top-users-table {float:left; border-collapse:collapse; margin-bottom:1em;}
 .qa-top-users-label {border:1px dashed #fff; border-right:1px dashed #fff; padding:6px 16px 6px 12px; text-align:left;}
-.qa-top-users-score {background:#ffffe6; border-color:#fff; border-style:dashed dashed dashed none; border-width:1px; color:#8D006A; padding:12px 24px; text-align:right;}
+.qa-top-users-score {background:#ffffe6; border-color:#fff; border-style:dashed dashed dashed none; border-width:1px; color:#335D99; padding:12px 24px; text-align:right;}
 .qa-top-users-spacer {padding:0 4px;}
 .qa-top-users-table td { background:#e0e0e0; font-size:18px;}
 /* Question view */

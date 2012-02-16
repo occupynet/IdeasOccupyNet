@@ -49,7 +49,7 @@
                         $fb_meta = '  <meta property="og:title" content="'.strip_tags($q_view["title"]).'"/>
                           <meta property="og:site_name" content="Occupy Ideas"/>
                           <meta property="og:url" content="'.$question_url.'"/>
-                          <meta property="og:image" content="http://occupywallstreet.net/bloombergbucks/images/bloombuck.png"/>
+                          <meta property="og:image" content="http://ideas.occupy.net/image/14107544841468846487?s=200"/>
                           <meta property="og:description" content="'.addslashes(strip_tags($q_view["content"])).'"/>';
                           
                         $share_facebook = $fb_meta."
