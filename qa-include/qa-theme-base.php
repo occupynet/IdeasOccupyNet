@@ -263,7 +263,7 @@
 			$this->output('>');
 			
 			if (isset($this->content['body_header']))
-				$this->output_raw($this->content['body_header'].'<iframe src="http://www.Occupy.net/nav/occupynet.html#ideas" frameborder="0" style="width:100%;height:36px;"></iframe>');
+				$this->output_raw($this->content['body_header'].'<script type="text/javascript" src="https://nav.occupy.net/occupynet_nav.js"></script>');
 				
 			$this->body_content();
 			
